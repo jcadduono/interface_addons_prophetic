@@ -1,0 +1,7 @@
+## Interface: 80100
+## Title: Prophetic
+## Notes: Prophetic is an addon for priests that simplifies gameplay and maximizes DPS by doing all the decision making for you
+## Author: jcadduono @ curseforge.com or Spy#1955 @ BattleTag
+## SavedVariablesPerCharacter: Prophetic
+## Version: 8.1.5-0
+Prophetic.lua
