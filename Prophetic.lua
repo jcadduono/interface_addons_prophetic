@@ -770,6 +770,7 @@ local ShadowMend = Ability.add(186263, false, true)
 ShadowMend.buff_duration = 10
 local WeakenedSoul = Ability.add(6788, false, true)
 WeakenedSoul.buff_duration = 6
+WeakenedSoul.auraTarget = 'player'
 ------ Talents
 local PurgeTheWicked = Ability.add(204197, false, true, 204213)
 PurgeTheWicked.buff_duration = 20
@@ -1062,7 +1063,9 @@ APL[SPEC.DISCIPLINE].main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if (HealthPct() < Opt.pws_threshold or Atonement:down()) and PowerWordShield:usable() then
+	if HealthPct() < 30 and DesperatePrayer:usable() then
+		UseExtra(DesperatePrayer)
+	elseif (HealthPct() < Opt.pws_threshold or Atonement:down()) and PowerWordShield:usable() then
 		UseExtra(PowerWordShield)
 	end
 	if var.swp:usable() and var.swp:down() and Target.timeToDie > 4 then
@@ -1089,13 +1092,10 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Shadowfiend:usable() and Target.timeToDie > 15 then
 		UseCooldown(Shadowfiend)
 	end
-	if Penance:ready(0.4) then
-		return Penance
-	end
 	if PlayerIsMoving() and var.swp:usable() and var.swp:refreshable() then
 		return var.swp
 	end
-	if Schism.known and Schism:usable() and Schism:down() then
+	if Schism:usable() and Target.timeToDie > 4 then
 		return Schism
 	end
 	return Smite
