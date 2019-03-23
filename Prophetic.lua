@@ -783,6 +783,7 @@ local Schism = Ability.add(214621, false, true)
 Schism.buff_duration = 9
 Schism.cooldown_duration = 24
 Schism.mana_cost = 0.5
+local SearingLight = Ability.add(215768, false, true)
 local MindbenderDisc = Ability.add(123040, false, true)
 ------ Procs
 
@@ -1028,6 +1029,14 @@ function PowerWordShield:usable()
 	return Ability.usable(self)
 end
 
+function Penance:cooldown()
+	local remains = Ability.cooldown(self)
+	if SearingLight.known and Smite:casting() then
+		remains = max(remains - 1, 0)
+	end
+	return remains
+end
+
 -- End Ability Modifications
 
 local function UseCooldown(ability, overwrite, always)
@@ -1065,7 +1074,7 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	end
 	if HealthPct() < 30 and DesperatePrayer:usable() then
 		UseExtra(DesperatePrayer)
-	elseif (HealthPct() < Opt.pws_threshold or Atonement:down()) and PowerWordShield:usable() then
+	elseif (HealthPct() < Opt.pws_threshold or Atonement:remains() < GCD()) and PowerWordShield:usable() then
 		UseExtra(PowerWordShield)
 	end
 	if var.swp:usable() and var.swp:down() and Target.timeToDie > 4 then
