@@ -83,6 +83,7 @@ local function InitializeOpts()
 		auto_aoe = false,
 		auto_aoe_ttl = 10,
 		pot = false,
+		pws_threshold = 60,
 	})
 end
 
@@ -916,8 +917,24 @@ end
 
 -- Start Helpful Functions
 
+local function Health()
+	return var.health
+end
+
+local function HealthMax()
+	return var.health_max
+end
+
+local function HealthPct()
+	return var.health / var.health_max * 100
+end
+
 local function Mana()
 	return var.mana
+end
+
+local function ManaMax()
+	return var.mana_max
 end
 
 local function ManaPct()
@@ -926,10 +943,6 @@ end
 
 local function ManaRegen()
 	return var.mana_regen
-end
-
-local function ManaMax()
-	return var.mana_max
 end
 
 local function ManaTimeToMax()
@@ -984,7 +997,7 @@ local function PlayerIsMoving()
 end
 
 local function TargetIsStunnable()
-	if UnitIsPlayer('target') then
+	if Target.player then
 		return true
 	end
 	if Target.boss then
@@ -993,7 +1006,7 @@ local function TargetIsStunnable()
 	if var.instance == 'raid' then
 		return false
 	end
-	if UnitHealthMax('target') > UnitHealthMax('player') * 10 then
+	if Target.health_max > var.health_max * 10 then
 		return false
 	end
 	return true
@@ -1049,7 +1062,7 @@ APL[SPEC.DISCIPLINE].main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if Atonement:down() and PowerWordShield:usable() then
+	if (HealthPct() < Opt.pws_threshold or Atonement:down()) and PowerWordShield:usable() then
 		UseExtra(PowerWordShield)
 	end
 	if var.swp:usable() and var.swp:down() and Target.timeToDie > 4 then
@@ -1440,6 +1453,8 @@ local function UpdateCombat()
 	var.execute_remains = max(remains and (remains / 1000 - var.time) or 0, var.gcd_remains)
 	var.haste_factor = 1 / (1 + UnitSpellHaste('player') / 100)
 	var.gcd = 1.5 * var.haste_factor
+	var.health = UnitHealth('player')
+	var.health_max = UnitHealthMax('player')
 	var.mana_regen = GetPowerRegen()
 	var.mana = UnitPower('player', 0) + (var.mana_regen * var.execute_remains)
 	var.mana_max = UnitPowerMax('player', 0)
@@ -1653,6 +1668,7 @@ local function UpdateTargetInfo()
 	local guid = UnitGUID('target')
 	if not guid then
 		Target.guid = nil
+		Target.player = false
 		Target.boss = false
 		Target.hostile = true
 		Target.healthMax = 0
@@ -1682,7 +1698,8 @@ local function UpdateTargetInfo()
 	end
 	Target.level = UnitLevel('target')
 	Target.healthMax = UnitHealthMax('target')
-	if UnitIsPlayer('target') then
+	Target.player = UnitIsPlayer('target')
+	if Target.player then
 		Target.boss = false
 	elseif Target.level == -1 then
 		Target.boss = true
@@ -2071,6 +2088,12 @@ function SlashCmdList.Prophetic(msg, editbox)
 		end
 		return print('Prophetic - Show Battle potions in cooldown UI: ' .. (Opt.pot and '|cFF00C000On' or '|cFFC00000Off'))
 	end
+	if msg[1] == 'pws' then
+		if msg[2] then
+			Opt.pws_threshold = max(min(tonumber(msg[2]) or 60, 100), 0)
+		end
+		return print('Prophetic - Health percentage threshold to show Power Word: Shield reminder: |cFFFFD000' .. Opt.pws_threshold .. '%|r')
+	end
 	if msg[1] == 'reset' then
 		propheticPanel:ClearAllPoints()
 		propheticPanel:SetPoint('CENTER', 0, -169)
@@ -2100,6 +2123,7 @@ function SlashCmdList.Prophetic(msg, editbox)
 		'auto |cFF00C000on|r/|cFFC00000off|r  - automatically change target mode on AoE spells',
 		'ttl |cFFFFD000[seconds]|r  - time target exists in auto AoE after being hit (default is 10 seconds)',
 		'pot |cFF00C000on|r/|cFFC00000off|r - show Battle potions in cooldown UI',
+		'pws |cFFFFD000[percent]|r - health percentage threshold to show Power Word: Shield reminder',
 		'|cFFFFD000reset|r - reset the location of the Prophetic UI to default',
 	} do
 		print('  ' .. SLASH_Prophetic1 .. ' ' .. cmd)
