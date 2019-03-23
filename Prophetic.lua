@@ -1052,29 +1052,20 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Atonement:down() and PowerWordShield:usable() then
 		UseExtra(PowerWordShield)
 	end
-	if PurgeTheWicked.known then
-		if PurgeTheWicked:usable() and PurgeTheWicked:down() and Target.timeToDie > 4 then
-			return PurgeTheWicked
-		end
-	else
-		if ShadowWordPain:usable() and ShadowWordPain:down() and Target.timeToDie > 4 then
-			return ShadowWordPain
-		end
+	if var.swp:usable() and var.swp:down() and Target.timeToDie > 4 then
+		return var.swp
 	end
-	if Schism.known and not PlayerIsMoving() and Schism:down() and Schism:usable() then
+	if Schism:usable() and not PlayerIsMoving() and Target.timeToDie > 4 then
 		return Schism
+	end
+	if ManaPct() < 95 and PowerWordSolace:usable() then
+		return PowerWordSolace
 	end
 	if Penance:usable() then
 		return Penance
 	end
-	if PurgeTheWicked.known then
-		if PurgeTheWicked:usable() and PurgeTheWicked:refreshable() and Target.timeToDie > PurgeTheWicked:remains() + 4 then
-			return PurgeTheWicked
-		end
-	else
-		if ShadowWordPain:usable() and ShadowWordPain:refreshable() and Target.timeToDie > ShadowWordPain:remains() + 4 then
-			return ShadowWordPain
-		end
+	if var.swp:usable() and var.swp:refreshable() and Target.timeToDie > var.swp:remains() + 4 then
+		return var.swp
 	end
 	if PowerWordSolace:usable() then
 		return PowerWordSolace
@@ -1088,16 +1079,8 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Penance:ready(0.4) then
 		return Penance
 	end
-	if PlayerIsMoving() then
-		if PurgeTheWicked.known then
-			if PurgeTheWicked:usable() and PurgeTheWicked:refreshable() then
-				return PurgeTheWicked
-			end
-		else
-			if ShadowWordPain:usable() and ShadowWordPain:refreshable() then
-				return ShadowWordPain
-			end
-		end
+	if PlayerIsMoving() and var.swp:usable() and var.swp:refreshable() then
+		return var.swp
 	end
 	if Schism.known and Schism:usable() and Schism:down() then
 		return Schism
@@ -1419,7 +1402,7 @@ local function UpdateTargetHealth()
 	Target.health = UnitHealth('target')
 	table.remove(Target.healthArray, 1)
 	Target.healthArray[15] = Target.health
-	Target.timeToDieMax = Target.health / UnitHealthMax('player') * 10
+	Target.timeToDieMax = Target.health / UnitHealthMax('player') * 20
 	Target.healthPercentage = Target.healthMax > 0 and (Target.health / Target.healthMax * 100) or 100
 	Target.healthLostPerSec = (Target.healthArray[1] - Target.health) / 3
 	Target.timeToDie = Target.healthLostPerSec > 0 and min(Target.timeToDieMax, Target.health / Target.healthLostPerSec) or Target.timeToDieMax
@@ -1765,6 +1748,9 @@ local function UpdateAbilityData()
 		ability.known = (IsPlayerSpell(ability.spellId) or (ability.spellId2 and IsPlayerSpell(ability.spellId2)) or Azerite.traits[ability.spellId]) and true or false
 	end
 	Lightspawn.known = Shadowfiend.known
+	if currentSpec == SPEC.DISCIPLINE then
+		var.swp = PurgeTheWicked.known and PurgeTheWicked or ShadowWordPain
+	end
 	abilities.bySpellId = {}
 	abilities.velocity = {}
 	abilities.autoAoe = {}
