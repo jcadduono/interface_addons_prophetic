@@ -1550,12 +1550,6 @@ function events:SPELL_UPDATE_COOLDOWN()
 	end
 end
 
-function events:UNIT_POWER_UPDATE(srcName, powerType)
-	if srcName == 'player' and powerType == 'DISCIPLINE_CHARGES' then
-		UpdateCombatWithin(0.05)
-	end
-end
-
 function events:UNIT_SPELLCAST_START(srcName)
 	if Opt.interrupt and srcName == 'target' then
 		UpdateCombatWithin(0.05)
