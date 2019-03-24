@@ -387,6 +387,7 @@ function Ability.add(spellId, buff, player, spellId2)
 		hasted_duration = false,
 		hasted_cooldown = false,
 		hasted_ticks = false,
+		channel_fully = false,
 		known = false,
 		mana_cost = 0,
 		cooldown_duration = 0,
@@ -574,10 +575,7 @@ end
 function Ability:casting()
 	return var.ability_casting == self
 end
-
-function Ability:channeling()
-	return UnitChannelInfo('player') == self.name
-end
+Ability.channeling = Ability.casting
 
 function Ability:castTime()
 	local _, _, _, castTime = GetSpellInfo(self.spellId)
@@ -752,6 +750,7 @@ Penance.mana_cost = 2
 Penance.buff_duration = 2
 Penance.cooldown_duration = 9
 Penance.hasted_duration = true
+Penance.channel_fully = true
 local PowerWordBarrier = Ability.add(62618, true, true, 81782)
 PowerWordBarrier.mana_cost = 4
 PowerWordBarrier.buff_duration = 10
@@ -1458,7 +1457,19 @@ local function UpdateCombat()
 	start, duration = GetSpellCooldown(61304)
 	var.gcd_remains = start > 0 and duration - (var.time - start) or 0
 	_, _, _, _, remains, _, _, _, spellId = UnitCastingInfo('player')
-	var.ability_casting = abilities.bySpellId[spellId]
+	if not remains then
+		_, _, _, _, remains, _, _, _, spellId = UnitChannelInfo('player')
+		if not remains then
+			var.ability_casting = nil
+		else
+			var.ability_casting = abilities.bySpellId[spellId]
+			if not var.ability_casting or (var.ability_casting and not var.ability_casting.channel_fully) then
+				remains = nil
+			end
+		end
+	else
+		var.ability_casting = abilities.bySpellId[spellId]
+	end
 	var.execute_remains = max(remains and (remains / 1000 - var.time) or 0, var.gcd_remains)
 	var.haste_factor = 1 / (1 + UnitSpellHaste('player') / 100)
 	var.gcd = 1.5 * var.haste_factor
