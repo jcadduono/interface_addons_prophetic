@@ -1268,7 +1268,7 @@ function Target:UpdateHealth()
 	self.health_max = UnitHealthMax('target')
 	table.remove(self.healthArray, 1)
 	self.healthArray[25] = self.health
-	self.timeToDieMax = self.health / Player.health_max * 15
+	self.timeToDieMax = self.health / Player.health_max * (Player.spec == SPEC.SHADOW and 15 or 25)
 	self.healthPercentage = self.health_max > 0 and (self.health / self.health_max * 100) or 100
 	self.healthLostPerSec = (self.healthArray[1] - self.health) / 5
 	self.timeToDie = self.healthLostPerSec > 0 and min(self.timeToDieMax, self.health / self.healthLostPerSec) or self.timeToDieMax
