@@ -1336,6 +1336,13 @@ end
 
 -- Start Ability Modifications
 
+function ConcentratedFlame.dot:Remains()
+	if ConcentratedFlame:Traveling() then
+		return self:Duration()
+	end
+	return Ability.Remains(self)
+end
+
 function PowerWordShield:Usable()
 	if WeakenedSoul:Up() then
 		return false
@@ -1405,6 +1412,9 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
+	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (ConcentratedFlame:Charges() > 1.8 or Schism:Up()) then
+		UseCooldown(ConcentratedFlame)
+	end
 	if Penance:Usable() then
 		return Penance
 	end
@@ -1413,6 +1423,9 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	end
 	if PowerWordSolace:Usable() then
 		return PowerWordSolace
+	end
+	if not Schism.known and ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() then
+		UseCooldown(ConcentratedFlame)
 	end
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
