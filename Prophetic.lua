@@ -887,7 +887,10 @@ local MindbenderShadow = Ability:Add(200174, false, true)
 
 -- Heart of Azeroth
 ---- Azerite Traits
-
+local DepthOfTheShadows = Ability:Add(275541, true, true, 275544)
+DepthOfTheShadows.buff_duration = 12
+local SuddenRevelation = Ability:Add(287355, true, true, 287360)
+SuddenRevelation.buff_duration = 30
 ---- Major Essences
 local BloodOfTheEnemy = Ability:Add(298277, false, true)
 BloodOfTheEnemy.buff_duration = 10
@@ -1438,6 +1441,9 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	end
 	if Schism:Usable() and Target.timeToDie > 4 then
 		return Schism
+	end
+	if HolyNova:Usable() and (SuddenRevelation:Up() or Player.enemies >= 4) then
+		return HolyNova
 	end
 	return Smite
 end
