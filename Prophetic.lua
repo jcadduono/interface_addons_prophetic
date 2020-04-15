@@ -773,7 +773,7 @@ Fade.buff_duration = 10
 Fade.cooldown_duration = 30
 local HolyNova = Ability:Add(132157, false, true, 281265)
 HolyNova.mana_cost = 1.6
-HolyNova:AutoAoe()
+HolyNova:AutoAoe(true)
 local LeapOfFaith = Ability:Add(73325, false, true)
 LeapOfFaith.mana_cost = 2.6
 LeapOfFaith.cooldown_duration = 90
@@ -1415,7 +1415,7 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
-	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (ConcentratedFlame:Charges() > 1.8 or Schism:Up()) then
+	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (ConcentratedFlame:Charges() > 1.8 or Schism:Remains() > 1.5) then
 		UseCooldown(ConcentratedFlame)
 	end
 	if Penance:Usable() then
@@ -1442,8 +1442,8 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Schism:Usable() and Target.timeToDie > 4 then
 		return Schism
 	end
-	if HolyNova:Usable() and (SuddenRevelation:Up() or Player.enemies >= 4) then
-		return HolyNova
+	if HolyNova:Usable() and (SuddenRevelation:Up() or (Player.enemies >= 4 and Schism:Down())) then
+		UseCooldown(HolyNova)
 	end
 	return Smite
 end
