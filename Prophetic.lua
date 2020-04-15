@@ -1409,19 +1409,19 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Player.swp:Usable() and Player.swp:Down() and Target.timeToDie > 4 then
 		return Player.swp
 	end
-	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 then
+	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
 		return Schism
 	end
 	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
-	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (ConcentratedFlame:Charges() > 1.8 or Schism:Remains() > 1.5) then
+	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (ConcentratedFlame:Charges() > 1.8 or Schism:Remains() > 1) then
 		UseCooldown(ConcentratedFlame)
 	end
 	if Penance:Usable() then
 		return Penance
 	end
-	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > Player.swp:Remains() + 4 then
+	if Player.swp:Usable() and ((Player.swp:Refreshable() and Schism:Down()) or (Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10)) and Target.timeToDie > Player.swp:Remains() + 4 then
 		return Player.swp
 	end
 	if PowerWordSolace:Usable() then
