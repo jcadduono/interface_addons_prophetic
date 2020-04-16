@@ -1409,14 +1409,14 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Player.swp:Usable() and Player.swp:Down() and Target.timeToDie > 4 then
 		return Player.swp
 	end
+	if ConcentratedFlame:Usable() and ConcentratedFlame:Charges() > 1.8 and Schism:Down() then
+		UseCooldown(ConcentratedFlame)
+	end
 	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
 		return Schism
 	end
 	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
 		return PowerWordSolace
-	end
-	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (ConcentratedFlame:Charges() > 1.8 or Schism:Remains() > 1) then
-		UseCooldown(ConcentratedFlame)
 	end
 	if Penance:Usable() then
 		return Penance
@@ -1427,7 +1427,7 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
-	if not Schism.known and ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() then
+	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (Schism:Down() or (Target.boss and Target.timeToDie < 4)) then
 		UseCooldown(ConcentratedFlame)
 	end
 	if DivineStar:Usable() then
@@ -1439,7 +1439,7 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Player.moving and Player.swp:Usable() and Player.swp:Refreshable() then
 		return Player.swp
 	end
-	if Schism:Usable() and Target.timeToDie > 4 then
+	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
 	end
 	if HolyNova:Usable() and (SuddenRevelation:Up() or (Player.enemies >= 4 and Schism:Down())) then
