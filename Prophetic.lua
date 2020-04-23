@@ -479,7 +479,7 @@ function Ability:Ready(seconds)
 	return self:Cooldown() <= (seconds or 0)
 end
 
-function Ability:Usable()
+function Ability:Usable(seconds)
 	if not self.known then
 		return false
 	end
@@ -489,7 +489,7 @@ function Ability:Usable()
 	if self.requires_charge and self:Charges() == 0 then
 		return false
 	end
-	return self:Ready()
+	return self:Ready(seconds)
 end
 
 function Ability:Remains()
@@ -1406,26 +1406,29 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	elseif (Player:HealthPct() < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	end
+	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
+		return PowerWordSolace
+	end
 	if Player.swp:Usable() and Player.swp:Down() and Target.timeToDie > 4 then
 		return Player.swp
 	end
-	if ConcentratedFlame:Usable() and ConcentratedFlame:Charges() > 1.8 and Schism:Down() then
+	if ConcentratedFlame:Usable() and ConcentratedFlame:Charges() > 1.6 and Schism:Down() then
 		UseCooldown(ConcentratedFlame)
+	end
+	if Schism.known and Shadowfiend:Usable() and Schism:Ready(3) and Target.timeToDie > 15 then
+		UseCooldown(Shadowfiend)
 	end
 	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
 		return Schism
 	end
-	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
-		return PowerWordSolace
-	end
 	if Penance:Usable() then
 		return Penance
 	end
+	if PowerWordSolace:Usable(0.2) then
+		return PowerWordSolace
+	end
 	if Player.swp:Usable() and ((Player.swp:Refreshable() and Schism:Down()) or (Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10)) and Target.timeToDie > Player.swp:Remains() + 4 then
 		return Player.swp
-	end
-	if PowerWordSolace:Usable() then
-		return PowerWordSolace
 	end
 	if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (Schism:Down() or (Target.boss and Target.timeToDie < 4)) then
 		UseCooldown(ConcentratedFlame)
