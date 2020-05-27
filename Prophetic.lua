@@ -133,6 +133,7 @@ local Player = {
 	previous_gcd = {},-- list of previous GCD abilities
 	item_use_blacklist = { -- list of item IDs with on-use effects we should mark unusable
 		[165581] = true, -- Crest of Pa'ku (Horde)
+		[174044] = true, -- Humming Black Dragonscale (parachute)
 	},
 }
 
@@ -1178,19 +1179,6 @@ function Player:BloodlustActive()
 			return true
 		end
 	end
-end
-
-function Player:Equipped(itemID, slot)
-	if slot then
-		return GetInventoryItemID('player', slot) == itemID, slot
-	end
-	local i
-	for i = 1, 19 do
-		if GetInventoryItemID('player', i) == itemID then
-			return true, i
-		end
-	end
-	return false
 end
 
 function Player:Equipped(itemID, slot)
