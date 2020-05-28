@@ -129,6 +129,9 @@ local Player = {
 	mana = 0,
 	mana_max = 0,
 	mana_regen = 0,
+	insanity = 0,
+	insanity_max = 100,
+	insanity_drain = 0,
 	last_swing_taken = 0,
 	previous_gcd = {},-- list of previous GCD abilities
 	item_use_blacklist = { -- list of item IDs with on-use effects we should mark unusable
@@ -451,6 +454,7 @@ function Ability:Add(spellId, buff, player, spellId2)
 		hasted_ticks = false,
 		known = false,
 		mana_cost = 0,
+		insanity_cost = 0,
 		cooldown_duration = 0,
 		buff_duration = 0,
 		tick_interval = 0,
@@ -485,6 +489,9 @@ function Ability:Usable(seconds)
 		return false
 	end
 	if self:Cost() > Player.mana then
+		return false
+	end
+	if Player.spec == SPEC.SHADOW and self:InsanityCost() > Player.insanity then
 		return false
 	end
 	if self.requires_charge and self:Charges() == 0 then
@@ -599,6 +606,10 @@ end
 
 function Ability:Cost()
 	return self.mana_cost > 0 and (self.mana_cost / 100 * Player.mana_base) or 0
+end
+
+function Ability:InsanityCost()
+	return self.insanity_cost or 0
 end
 
 function Ability:Charges()
@@ -802,6 +813,7 @@ ShadowWordPain.mana_cost = 1.8
 ShadowWordPain.buff_duration = 16
 ShadowWordPain.tick_interval = 2
 ShadowWordPain.hasted_ticks = true
+ShadowWordPain.insanity_cost = -4
 local Smite = Ability:Add(585, false, true, 208772)
 Smite.mana_cost = 0.5
 ------ Talents
@@ -878,12 +890,24 @@ Renew.hasted_ticks = true
 
 ---- Shadow
 local Dispersion = Ability:Add(47585, true, true)
+Dispersion.buff_duration = 6
+Dispersion.cooldown_duration = 120
 local Silence = Ability:Add(15487, false, true)
 Silence.cooldown_duration = 45
 Silence.buff_duration = 4
-local Voidform = Ability:Add(194249, true, true)
+local VampiricTouch = Ability:Add(34914, false, true)
+VampiricTouch.buff_duration = 21
+VampiricTouch.tick_interval = 3
+VampiricTouch.hasted_ticks = true
+VampiricTouch.insanity_cost = -6
+local Voidform = Ability:Add(228264, true, true, 194249)
+Voidform.insanity_drain_stack = 0
+Voidform.insanity_drain_paused = false
 ------ Talents
 local MindbenderShadow = Ability:Add(200174, false, true)
+local VoidTorrent = Ability:Add(263165, true, true)
+VoidTorrent.buff_duration = 4
+VoidTorrent.cooldown_duration = 45
 ------ Procs
 
 -- Heart of Azeroth
@@ -1200,6 +1224,7 @@ end
 
 function Player:UpdateAbilities()
 	Player.mana_base = BaseMana[UnitLevel('player')]
+	Player.insanity_max = UnitPowerMax('player', 13)
 
 	local _, ability
 
@@ -1259,7 +1284,7 @@ function Target:UpdateHealth()
 	self.health_max = UnitHealthMax('target')
 	table.remove(self.healthArray, 1)
 	self.healthArray[25] = self.health
-	self.timeToDieMax = self.health / Player.health_max * (Player.spec == SPEC.SHADOW and 15 or 25)
+	self.timeToDieMax = self.health / Player.health_max * (Voidform.known and 15 or 25)
 	self.healthPercentage = self.health_max > 0 and (self.health / self.health_max * 100) or 100
 	self.healthLostPerSec = (self.healthArray[1] - self.health) / 5
 	self.timeToDie = self.healthLostPerSec > 0 and min(self.timeToDieMax, self.health / self.healthLostPerSec) or self.timeToDieMax
@@ -1347,6 +1372,20 @@ function Penance:Cooldown()
 		remains = max(remains - 1, 0)
 	end
 	return remains
+end
+
+function ShadowWordPain:Cost()
+	if Voidform.known then
+		return 0
+	end
+	return Ability.Cost(self)
+end
+
+function Voidform:InsanityDrain()
+	if self.insanity_drain_stack == 0 or self.insanity_drain_paused then
+		return 0
+	end
+	return floor(6.5 + (2/3 * (self.insanity_drain_stack - 1)))
 end
 
 -- End Ability Modifications
@@ -1706,14 +1745,18 @@ end
 
 function UI:UpdateDisplay()
 	timer.display = 0
-	local dim, text_center
+	local dim, text_center, text_tl
 	if Opt.dimmer then
 		dim = not ((not Player.main) or
 		           (Player.main.spellId and IsUsableSpell(Player.main.spellId)) or
 		           (Player.main.itemId and IsUsableItem(Player.main.itemId)))
 	end
+	if Voidform.known then
+		text_tl = Player.insanity_drain
+	end
 	propheticPanel.dimmer:SetShown(dim)
 	propheticPanel.text.center:SetText(text_center)
+	propheticPanel.text.tl:SetText(text_tl)
 	--propheticPanel.text.bl:SetText(format('%.1fs', Target.timeToDie))
 end
 
@@ -1742,6 +1785,13 @@ function UI:UpdateCombat()
 		Player.mana = Player.mana - Player.ability_casting:Cost()
 	end
 	Player.mana = min(max(Player.mana, 0), Player.mana_max)
+	if Voidform.known then
+		Player.insanity = max(UnitPower('player', 13) - (Player.insanity_drain * Player.execute_remains), 0)
+		if Player.ability_casting then
+			Player.insanity = Player.insanity - Player.ability_casting:InsanityCost()
+		end
+		Player.insanity = min(max(Player.insanity, 0), Player.insanity_max)
+	end
 	Player.moving = GetUnitSpeed('player') ~= 0
 
 	trackAuras:Purge()
@@ -1868,6 +1918,7 @@ function events:COMBAT_LOG_EVENT_UNFILTERED()
 	   eventType == 'SPELL_HEAL' or
 	   eventType == 'SPELL_MISSED' or
 	   eventType == 'SPELL_AURA_APPLIED' or
+	   eventType == 'SPELL_AURA_APPLIED_DOSE' or
 	   eventType == 'SPELL_AURA_REFRESH' or
 	   eventType == 'SPELL_AURA_REMOVED')
 	then
@@ -1898,6 +1949,26 @@ function events:COMBAT_LOG_EVENT_UNFILTERED()
 		end
 		return
 	end
+
+	if Voidform.known then
+		if ability == Voidform then
+			if eventType == 'SPELL_AURA_APPLIED' then
+				ability.insanity_drain_stack = 1
+			elseif eventType == 'SPELL_AURA_REMOVED' then
+				ability.insanity_drain_stack = 0
+			elseif eventType == 'SPELL_AURA_APPLIED_DOSE' and not ability.insanity_drain_paused then
+				ability.insanity_drain_stack = ability.insanity_drain_stack + 1
+			end
+			Player.insanity_drain = ability:InsanityDrain()
+		elseif ability == VoidTorrent or ability == Dispersion then
+			if eventType == 'SPELL_AURA_APPLIED' then
+				Voidform.insanity_drain_paused = true
+			elseif eventType == 'SPELL_AURA_REMOVED' then
+				Voidform.insanity_drain_paused = false
+			end
+		end
+	end
+
 	if dstGUID == Player.guid then
 		return -- ignore buffs beyond here
 	end
