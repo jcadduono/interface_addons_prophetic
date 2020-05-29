@@ -659,7 +659,7 @@ function Ability:Casting()
 end
 
 function Ability:Channeling()
-	return UnitChannelInfo('player') == self.name
+	return Player.ability_channeling == self.name
 end
 
 function Ability:CastTime()
@@ -827,6 +827,7 @@ ShadowWordPain.buff_duration = 16
 ShadowWordPain.tick_interval = 2
 ShadowWordPain.hasted_ticks = true
 ShadowWordPain.insanity_cost = -4
+ShadowWordPain:TrackAuras()
 local Smite = Ability:Add(585, false, true, 208772)
 Smite.mana_cost = 0.5
 ------ Talents
@@ -921,6 +922,7 @@ VampiricTouch.buff_duration = 21
 VampiricTouch.tick_interval = 3
 VampiricTouch.hasted_ticks = true
 VampiricTouch.insanity_cost = -6
+VampiricTouch:TrackAuras()
 local VoidBolt = Ability:Add(205448, false, true)
 VoidBolt.cooldown_duration = 4.5
 VoidBolt.insanity_cost = -20
@@ -1482,11 +1484,11 @@ function VoidEruption:Usable()
 	return Ability.Usable(self)
 end
 
-function VoidBolt:Usable()
+function VoidBolt:Usable(seconds)
 	if Voidform:Down() then
 		return false
 	end
-	return Ability.Usable(self)
+	return Ability.Usable(self, seconds)
 end
 
 function ShadowWordPain:Remains()
@@ -1670,7 +1672,6 @@ actions+=/run_action_list,name=single,if=active_enemies=1
 	if Opt.pot and Target.boss and PotionOfUnbridledFury:Usable() and (Target.timeToDie < 80 or Target.healthPercentage < 35 or Player:BloodlustActive()) then
 		UseCooldown(PotionOfUnbridledFury)
 	end
-	Player.dots_up = ShadowWordPain:Ticking() > 0 and VampiricTouch:Ticking() > 0
 	if Player.enemies > 1 then
 		return self:cleave()
 	end
@@ -1808,6 +1809,9 @@ actions.cleave+=/shadow_word_pain
 	if MindbenderShadow:Usable() then
 		UseCooldown(MindbenderShadow)
 	end
+	if VoidBolt:Usable(Player.channel_remains) then
+		return VoidBolt
+	end
 	if MindBlast:Usable() and Player.enemies < Player.mind_blast_targets then
 		return MindBlast
 	end
@@ -1840,7 +1844,7 @@ actions.cleave+=/shadow_word_pain
 	if MindFlay:Usable() then
 		return MindFlay
 	end
-	if ShadowWordPain:Usable() then
+	if ShadowWordPain:Usable() and not Player.ability_channeling then
 		return ShadowWordPain
 	end
 end
@@ -1905,7 +1909,10 @@ actions.single+=/shadow_word_pain
 	if ShadowCrash:Usable() then
 		UseCooldown(ShadowCrash)
 	end
-	if Player.dots_up then
+	if ShadowWordPain:Up() and VampiricTouch:Up() then
+		if VoidBolt:Usable(Player.channel_remains) then
+			return VoidBolt
+		end
 		if MindBlast:Usable() then
 			return MindBlast
 		end
@@ -1925,7 +1932,7 @@ actions.single+=/shadow_word_pain
 	if MindFlay:Usable() then
 		return MindFlay
 	end
-	if ShadowWordPain:Usable() then
+	if ShadowWordPain:Usable() and not Player.ability_channeling then
 		return ShadowWordPain
 	end
 end
@@ -2202,6 +2209,9 @@ function UI:UpdateCombat()
 	_, _, _, _, remains, _, _, _, spellId = UnitCastingInfo('player')
 	Player.ability_casting = abilities.bySpellId[spellId]
 	Player.execute_remains = max(remains and (remains / 1000 - Player.ctime) or 0, Player.gcd_remains)
+	_, _, _, _, remains, _, _, spellId = UnitChannelInfo('player')
+	Player.ability_channeling = abilities.bySpellId[spellId]
+	Player.channel_remains = remains and (remains / 1000 - Player.ctime) or 0
 	Player.haste_factor = 1 / (1 + UnitSpellHaste('player') / 100)
 	Player.gcd = 1.5 * Player.haste_factor
 	Player.health = UnitHealth('player')
@@ -2374,6 +2384,9 @@ function events:COMBAT_LOG_EVENT_UNFILTERED()
 				propheticPreviousPanel.icon:SetTexture(ability.icon)
 				propheticPreviousPanel:Show()
 			end
+			if Opt.auto_aoe and ability == MindFlay then
+				Player:SetTargetMode(1)
+			end
 		end
 		return
 	end
@@ -2528,7 +2541,12 @@ function events:SPELL_UPDATE_COOLDOWN()
 			start = castStart / 1000
 			duration = (castEnd - castStart) / 1000
 		else
-			start, duration = GetSpellCooldown(61304)
+			_, _, _, castStart = UnitChannelInfo('player')
+			if castStart and Player.main then
+				start, duration = GetSpellCooldown(Player.main.spellId)
+			else
+				start, duration = GetSpellCooldown(61304)
+			end
 		end
 		propheticPanel.swipe:SetCooldown(start, duration)
 	end
