@@ -580,8 +580,14 @@ function Ability:CooldownDuration()
 end
 
 function Ability:Cooldown()
-	if self.cooldown_duration > 0 and self:Casting() then
-		return self.cooldown_duration
+	if self:Casting() then
+		if self.requires_charge then
+			if self:Charges() == 0 then
+				return self.cooldown_duration
+			end
+		elseif self.cooldown_duration > 0 then
+			return self.cooldown_duration
+		end
 	end
 	local start, duration = GetSpellCooldown(self.spellId)
 	if start == 0 then
@@ -613,15 +619,22 @@ function Ability:InsanityCost()
 end
 
 function Ability:Charges()
-	return (GetSpellCharges(self.spellId)) or 0
+	local charges = (GetSpellCharges(self.spellId)) or 0
+	if self:Casting() then
+		charges = charges - 1
+	end
+	return max(0, charges)
 end
 
 function Ability:ChargesFractional()
 	local charges, max_charges, recharge_start, recharge_time = GetSpellCharges(self.spellId)
-	if charges >= max_charges then
-		return charges
+	if charges < max_charges then
+		charges = charges + ((max(0, Player.ctime - recharge_start + Player.execute_remains)) / recharge_time)
 	end
-	return charges + ((max(0, Player.ctime - recharge_start + Player.execute_remains)) / recharge_time)
+	if self:Casting() then
+		charges = charges - 1
+	end
+	return min(max_charges, max(0, charges))
 end
 
 function Ability:FullRechargeTime()
@@ -892,6 +905,14 @@ Renew.hasted_ticks = true
 local Dispersion = Ability:Add(47585, true, true)
 Dispersion.buff_duration = 6
 Dispersion.cooldown_duration = 120
+local MindBlast = Ability:Add(8092, false, true)
+MindBlast.cooldown_duration = 7.5
+MindBlast.insanity_cost = -12
+MindBlast.hasted_cooldown = true
+local MindFlay = Ability:Add(15407, false, true)
+local MindSear = Ability:Add(48045, false, true, 49821)
+MindSear:AutoAoe(true)
+local Shadowform = Ability:Add(232698, true, true)
 local Silence = Ability:Add(15487, false, true)
 Silence.cooldown_duration = 45
 Silence.buff_duration = 4
@@ -900,11 +921,45 @@ VampiricTouch.buff_duration = 21
 VampiricTouch.tick_interval = 3
 VampiricTouch.hasted_ticks = true
 VampiricTouch.insanity_cost = -6
+local VoidBolt = Ability:Add(205448, false, true)
+VoidBolt.cooldown_duration = 4.5
+VoidBolt.insanity_cost = -20
+VoidBolt.hasted_cooldown = true
+local VoidEruption = Ability:Add(228260, false, true, 228360)
+VoidEruption.insanity_cost = 90
+VoidEruption:AutoAoe()
 local Voidform = Ability:Add(228264, true, true, 194249)
 Voidform.insanity_drain_stack = 0
 Voidform.insanity_drain_paused = false
 ------ Talents
+local DarkAscension = Ability:Add(280711, false, true)
+DarkAscension.cooldown_duration = 60
+DarkAscension.insanity_cost = -50
+local DarkVoid = Ability:Add(263346, false, true)
+DarkVoid.cooldown_duration = 30
+DarkVoid.insanity_cost = -30
+DarkVoid:AutoAoe()
+local LegacyOfTheVoid = Ability:Add(193225, true, true)
 local MindbenderShadow = Ability:Add(200174, false, true)
+MindbenderShadow.buff_duration = 15
+MindbenderShadow.cooldown_duration = 60
+local Misery = Ability:Add(238558, false, true)
+local ShadowCrash = Ability:Add(205385, false, true, 205386)
+ShadowCrash.cooldown_duration = 20
+ShadowCrash.insanity_cost = -20
+ShadowCrash:AutoAoe()
+local ShadowWordDeath = Ability:Add(32379, false, true)
+ShadowWordDeath.cooldown_duration = 9
+ShadowWordDeath.insanity_cost = -15
+ShadowWordDeath.requires_charge = true
+local ShadowWordVoid = Ability:Add(205351, false, true)
+ShadowWordVoid.cooldown_duration = 9
+ShadowWordVoid.insanity_cost = -15
+ShadowWordVoid.hasted_cooldown = true
+ShadowWordVoid.requires_charge = true
+local SurrenderToMadness = Ability:Add(193223, false, true)
+SurrenderToMadness.buff_duration = 60
+SurrenderToMadness.cooldown_duration = 180
 local VoidTorrent = Ability:Add(263165, true, true)
 VoidTorrent.buff_duration = 4
 VoidTorrent.cooldown_duration = 45
@@ -912,10 +967,18 @@ VoidTorrent.cooldown_duration = 45
 
 -- Heart of Azeroth
 ---- Azerite Traits
+local ChorusOfInsanity = Ability:Add(278661, true, true, 279572)
+ChorusOfInsanity.buff_duration = 120
+local DeathThroes = Ability:Add(278659, true, true)
 local DepthOfTheShadows = Ability:Add(275541, true, true, 275544)
 DepthOfTheShadows.buff_duration = 12
+local SearingDialogue = Ability:Add(272788, false, true, 288371)
+local SpitefulApparitions = Ability:Add(277682, true, true)
 local SuddenRevelation = Ability:Add(287355, true, true, 287360)
 SuddenRevelation.buff_duration = 30
+local ThoughtHarvester = Ability:Add(288340, true, true, 288343)
+ThoughtHarvester.buff_duration = 20
+local WhispersOfTheDamned = Ability:Add(275722, true, true)
 ---- Major Essences
 local BloodOfTheEnemy = Ability:Add(298277, false, true)
 BloodOfTheEnemy.buff_duration = 10
@@ -1246,9 +1309,26 @@ function Player:UpdateAbilities()
 		end
 	end
 
+	if ShadowWordVoid.known then
+		MindBlast.known = false
+	end
+	VoidBolt.known = VoidEruption.known
 	Lightspawn.known = Shadowfiend.known
 	if Player.spec == SPEC.DISCIPLINE then
 		Player.swp = PurgeTheWicked.known and PurgeTheWicked or ShadowWordPain
+	elseif Player.spec == SPEC.SHADOW then
+--[[
+actions.precombat+=/variable,name=mind_blast_targets,op=set,value=floor((4.5+azerite.whispers_of_the_damned.rank)%(1+0.27*azerite.searing_dialogue.rank))
+actions.precombat+=/variable,name=swp_trait_ranks_check,op=set,value=(1-0.07*azerite.death_throes.rank+0.2*azerite.thought_harvester.rank)*(1-0.09*azerite.thought_harvester.rank*azerite.searing_dialogue.rank)
+actions.precombat+=/variable,name=vt_trait_ranks_check,op=set,value=(1-0.04*azerite.thought_harvester.rank-0.05*azerite.spiteful_apparitions.rank)
+actions.precombat+=/variable,name=vt_mis_trait_ranks_check,op=set,value=(1-0.07*azerite.death_throes.rank-0.03*azerite.thought_harvester.rank-0.055*azerite.spiteful_apparitions.rank)*(1-0.027*azerite.thought_harvester.rank*azerite.searing_dialogue.rank)
+actions.precombat+=/variable,name=vt_mis_sd_check,op=set,value=1-0.014*azerite.searing_dialogue.rank
+]]
+		Player.mind_blast_targets = floor((4.5 + WhispersOfTheDamned:AzeriteRank()) / (1 + 0.27 * SearingDialogue:AzeriteRank()))
+		Player.swp_trait_ranks_check = (1 - 0.07 * DeathThroes:AzeriteRank() + 0.2 * ThoughtHarvester:AzeriteRank()) * (1 - 0.09 * ThoughtHarvester:AzeriteRank() * SearingDialogue:AzeriteRank())
+		Player.vt_trait_ranks_check = 1 - 0.04 * ThoughtHarvester:AzeriteRank() - 0.05 * SpitefulApparitions:AzeriteRank()
+		Player.vt_mis_trait_ranks_check = (1 - 0.07 * DeathThroes:AzeriteRank() - 0.03 * ThoughtHarvester:AzeriteRank() - 0.055 * SpitefulApparitions:AzeriteRank()) * (1 - 0.027 * ThoughtHarvester:AzeriteRank() * SearingDialogue:AzeriteRank())
+		Player.vt_mis_sd_check = 1 - 0.014 * SearingDialogue:AzeriteRank()
 	end
 
 	abilities.bySpellId = {}
@@ -1388,6 +1468,48 @@ function Voidform:InsanityDrain()
 	return floor(6.5 + (2/3 * (self.insanity_drain_stack - 1)))
 end
 
+function VoidEruption:InsanityCost()
+	if LegacyOfTheVoid.known then
+		return 60
+	end
+	return Ability.Cost(self)
+end
+
+function VoidEruption:Usable()
+	if Voidform:Up() then
+		return false
+	end
+	return Ability.Usable(self)
+end
+
+function VoidBolt:Usable()
+	if Voidform:Down() then
+		return false
+	end
+	return Ability.Usable(self)
+end
+
+function ShadowWordPain:Remains()
+	if Misery.known and VampiricTouch:Casting() then
+		return self:Duration()
+	end
+	return Ability.Remains(self)
+end
+
+function Shadowform:Remains()
+	if Voidform:Up() then
+		return 600
+	end
+	return Ability.Remains(self)
+end
+
+function Voidform:Remains()
+	if VoidEruption:Casting() then
+		return 600
+	end
+	return Ability.Remains(self)
+end
+
 -- End Ability Modifications
 
 local function UseCooldown(ability, overwrite)
@@ -1483,6 +1605,11 @@ APL[SPEC.HOLY].main = function(self)
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
 		end
+		if Opt.pot and not Player:InArenaOrBattleground() then
+			if GreaterFlaskOfEndlessFathoms:Usable() and GreaterFlaskOfEndlessFathoms.buff:Remains() < 300 then
+				UseCooldown(GreaterFlaskOfEndlessFathoms)
+			end
+		end
 	else
 		if PowerWordFortitude:Down() and PowerWordFortitude:Usable() then
 			UseExtra(PowerWordFortitude)
@@ -1492,13 +1619,314 @@ end
 
 APL[SPEC.SHADOW].main = function(self)
 	if Player:TimeInCombat() == 0 then
+--[[
+actions.precombat=flask
+actions.precombat+=/food
+actions.precombat+=/augmentation
+# Snapshot raid buffed stats before combat begins and pre-potting is done.
+actions.precombat+=/snapshot_stats
+actions.precombat+=/potion
+actions.precombat+=/variable,name=mind_blast_targets,op=set,value=floor((4.5+azerite.whispers_of_the_damned.rank)%(1+0.27*azerite.searing_dialogue.rank))
+actions.precombat+=/variable,name=swp_trait_ranks_check,op=set,value=(1-0.07*azerite.death_throes.rank+0.2*azerite.thought_harvester.rank)*(1-0.09*azerite.thought_harvester.rank*azerite.searing_dialogue.rank)
+actions.precombat+=/variable,name=vt_trait_ranks_check,op=set,value=(1-0.04*azerite.thought_harvester.rank-0.05*azerite.spiteful_apparitions.rank)
+actions.precombat+=/variable,name=vt_mis_trait_ranks_check,op=set,value=(1-0.07*azerite.death_throes.rank-0.03*azerite.thought_harvester.rank-0.055*azerite.spiteful_apparitions.rank)*(1-0.027*azerite.thought_harvester.rank*azerite.searing_dialogue.rank)
+actions.precombat+=/variable,name=vt_mis_sd_check,op=set,value=1-0.014*azerite.searing_dialogue.rank
+actions.precombat+=/shadowform,if=!buff.shadowform.up
+actions.precombat+=/use_item,name=azsharas_font_of_power
+actions.precombat+=/mind_blast,if=spell_targets.mind_sear<2|azerite.thought_harvester.rank=0
+actions.precombat+=/vampiric_touch
+]]
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
+		end
+		if Opt.pot and not Player:InArenaOrBattleground() then
+			if GreaterFlaskOfEndlessFathoms:Usable() and GreaterFlaskOfEndlessFathoms.buff:Remains() < 300 then
+				UseCooldown(GreaterFlaskOfEndlessFathoms)
+			end
+			if Opt.pot and Target.boss and PotionOfUnbridledFury:Usable() then
+				UseCooldown(PotionOfUnbridledFury)
+			end
+		end
+		if Shadowform:Usable() and Shadowform:Down() then
+			return Shadowform
+		end
+		if MindBlast:Usable() and (Player.enemies < 2 or ThoughtHarvester:AzeriteRank() == 0) then
+			return MindBlast
+		end
+		if VampiricTouch:Usable() and VampiricTouch:Down() then
+			return VampiricTouch
 		end
 	else
 		if PowerWordFortitude:Down() and PowerWordFortitude:Usable() then
 			UseExtra(PowerWordFortitude)
 		end
+	end
+--[[
+actions=potion,if=buff.bloodlust.react|target.time_to_die<=80|target.health.pct<35
+actions+=/variable,name=dots_up,op=set,value=dot.shadow_word_pain.ticking&dot.vampiric_touch.ticking
+actions+=/run_action_list,name=cleave,if=active_enemies>1
+actions+=/run_action_list,name=single,if=active_enemies=1
+]]
+	if Opt.pot and Target.boss and PotionOfUnbridledFury:Usable() and (Target.timeToDie < 80 or Target.healthPercentage < 35 or Player:BloodlustActive()) then
+		UseCooldown(PotionOfUnbridledFury)
+	end
+	Player.dots_up = ShadowWordPain:Ticking() > 0 and VampiricTouch:Ticking() > 0
+	if Player.enemies > 1 then
+		return self:cleave()
+	end
+	return self:single()
+end
+
+APL[SPEC.SHADOW].cds = function(self)
+--[[
+# Use Memory of Lucid Dreams right before you are about to fall out of Voidform
+actions.cds=memory_of_lucid_dreams,if=(buff.voidform.stack>20&insanity<=50)|buff.voidform.stack>(26+7*buff.bloodlust.up)|(current_insanity_drain*((gcd.max*2)+action.mind_blast.cast_time))>insanity
+actions.cds+=/blood_of_the_enemy
+actions.cds+=/guardian_of_azeroth,if=buff.voidform.stack>15
+actions.cds+=/use_item,name=manifesto_of_madness,if=spell_targets.mind_sear>=2|raid_event.adds.in>60
+actions.cds+=/focused_azerite_beam,if=spell_targets.mind_sear>=2|raid_event.adds.in>60
+actions.cds+=/purifying_blast,if=spell_targets.mind_sear>=2|raid_event.adds.in>60
+# Wait at least 6s between casting CF. Use the first cast ASAP to get it on CD, then every subsequent cast should be used when Chorus of Insanity is active or it will recharge in the next gcd, or the target is about to die.
+actions.cds+=/concentrated_flame,line_cd=6,if=time<=10|(buff.chorus_of_insanity.stack>=15&buff.voidform.up)|full_recharge_time<gcd|target.time_to_die<5
+actions.cds+=/ripple_in_space
+actions.cds+=/reaping_flames
+actions.cds+=/worldvein_resonance
+# Use these cooldowns in between your 1st and 2nd Void Bolt in your 2nd Voidform when you have Chorus of Insanity active
+actions.cds+=/call_action_list,name=crit_cds,if=(buff.voidform.up&buff.chorus_of_insanity.stack>20)|azerite.chorus_of_insanity.rank=0
+# Default fallback for usable items: Use on cooldown.
+actions.cds+=/use_items
+]]
+	if MemoryOfLucidDreams.known then
+		if MemoryOfLucidDreams:Usable() and ((Voidform:Stack() > 20 and Player.insanity <= 50) or (Voidform:Stack() > (Player:BloodlustActive() and 33 or 26)) or ((Player.insanity_drain * ((Player.gcd * 2) + MindBlast:CastTime())) > Player.insanity)) then
+			return UseCooldown(MemoryOfLucidDreams)
+		end
+	elseif BloodOfTheEnemy.known then
+		if BloodOfTheEnemy:Usable() then
+			return UseCooldown(BloodOfTheEnemey)
+		end
+	elseif GuardianOfAzeroth.known then
+		if GuardianOfAzeroth:Usable() and Voidform:Stack() > 15 then
+			return UseCooldown(GuardianOfAzeroth)
+		end
+	elseif FocusedAzeriteBeam.known then
+		if FocusedAzeriteBeam:Usable() then
+			return UseCooldown(FocusedAzeriteBeam)
+		end
+	elseif PurifyingBlast.known then
+		if PurifyingBlast:Usable() then
+			return UseCooldown(PurifyingBlast)
+		end
+	elseif ConcentratedFlame.known then
+		if ConcentratedFlame:Usable() and ConcentratedFlame.dot:Down() and (Target.timeToDie < 5 or Player:TimeInCombat() < 10 or (ChorusOfInsanity:Stack() >= 15 and Voidform:Up()) or ConcentratedFlame:FullRechargeTime() < Player.gcd) then
+			return UseCooldown(ConcentratedFlame)
+		end
+	elseif RippleInSpace.known then
+		if RippleInSpace:Usable() then
+			return UseCooldown(RippleInSpace)
+		end
+	elseif ReapingFlames.known then
+		if ReapingFlames:Usable() then
+			return UseCooldown(ReapingFlames)
+		end
+	elseif WorldveinResonance.known then
+		if WorldveinResonance:Usable() and Lifeblood:Stack() < 4 then
+			return UseCooldown(WorldveinResonance)
+		end
+	end
+	if not ChorusOfInsanity.known or (Voidform:Up() and ChorusOfInsanity:Stack() > 20) then
+		local apl = self:crit_cds()
+		if apl then return apl end
+	end
+	if Opt.trinket then
+		if Trinket1:Usable() then
+			UseCooldown(Trinket1)
+		elseif Trinket2:Usable() then
+			UseCooldown(Trinket2)
+		end
+	end
+end
+
+APL[SPEC.SHADOW].crit_cds = function(self)
+--[[
+actions.crit_cds=use_item,name=azsharas_font_of_power
+actions.crit_cds+=/use_item,effect_name=cyclotronic_blast
+actions.crit_cds+=/the_unbound_force
+]]
+	if TheUnboundForce:Usable() then
+		return UseCooldown(TheUnboundForce)
+	end
+end
+
+APL[SPEC.SHADOW].cleave = function(self)
+--[[
+actions.cleave=void_eruption
+actions.cleave+=/dark_ascension,if=buff.voidform.down
+actions.cleave+=/vampiric_touch,if=!ticking&azerite.thought_harvester.rank>=1
+actions.cleave+=/mind_sear,if=buff.harvested_thoughts.up
+actions.cleave+=/void_bolt
+actions.cleave+=/call_action_list,name=cds
+actions.cleave+=/shadow_word_death,target_if=target.time_to_die<3|buff.voidform.down
+actions.cleave+=/surrender_to_madness,if=buff.voidform.stack>10+(10*buff.bloodlust.up)
+# Use Dark Void on CD unless adds are incoming in 10s or less.
+actions.cleave+=/dark_void,if=raid_event.adds.in>10&(dot.shadow_word_pain.refreshable|target.time_to_die>30)
+actions.cleave+=/mindbender
+actions.cleave+=/mind_blast,target_if=spell_targets.mind_sear<variable.mind_blast_targets
+actions.cleave+=/shadow_crash,if=(raid_event.adds.in>5&raid_event.adds.duration<2)|raid_event.adds.duration>2
+actions.cleave+=/shadow_word_pain,target_if=refreshable&target.time_to_die>((-1.2+3.3*spell_targets.mind_sear)*variable.swp_trait_ranks_check*(1-0.012*azerite.searing_dialogue.rank*spell_targets.mind_sear)),if=!talent.misery.enabled
+actions.cleave+=/vampiric_touch,target_if=refreshable,if=target.time_to_die>((1+3.3*spell_targets.mind_sear)*variable.vt_trait_ranks_check*(1+0.10*azerite.searing_dialogue.rank*spell_targets.mind_sear))
+actions.cleave+=/vampiric_touch,target_if=dot.shadow_word_pain.refreshable,if=(talent.misery.enabled&target.time_to_die>((1.0+2.0*spell_targets.mind_sear)*variable.vt_mis_trait_ranks_check*(variable.vt_mis_sd_check*spell_targets.mind_sear)))
+actions.cleave+=/void_torrent,if=buff.voidform.up
+actions.cleave+=/mind_sear,target_if=spell_targets.mind_sear>1,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2
+actions.cleave+=/mind_flay,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2&(cooldown.void_bolt.up|cooldown.mind_blast.up)
+actions.cleave+=/shadow_word_pain
+]]
+	if VoidEruption:Usable() then
+		UseCooldown(VoidEruption)
+	end
+	if DarkAscension:Usable() and Voidform:Down() then
+		UseCooldown(DarkAscension)
+	end
+	if ThoughtHarvester.known and VampiricTouch:Usable() and VampiricTouch:Down() then
+		return VampiricTouch
+	end
+	if MindSear:Usable() and ThoughtHarvester:Up() then
+		return MindSear
+	end
+	if VoidBolt:Usable() then
+		return VoidBolt
+	end
+	self:cds()
+	if ShadowWordDeath:Usable() and (Target.timeToDie < 3 or Voidform:Down()) then
+		return ShadowWordDeath
+	end
+	if SurrenderToMadness:Usable() and Voidform:Stack() > (Player:BloodlustActive() and 20 or 10) then
+		UseCooldown(SurrenderToMadness)
+	end
+	if DarkVoid:Usable() and (ShadowWordPain:Refreshable() or Target.timeToDie > 30) then
+		UseCooldown(DarkVoid)
+	end
+	if MindbenderShadow:Usable() then
+		UseCooldown(MindbenderShadow)
+	end
+	if MindBlast:Usable() and Player.enemies < Player.mind_blast_targets then
+		return MindBlast
+	end
+	if ShadowWordVoid:Usable() and Player.enemies < Player.mind_blast_targets then
+		return ShadowWordVoid
+	end
+	if ShadowCrash:Usable() then
+		UseCooldown(ShadowCrash)
+	end
+	if not Misery.known and ShadowWordPain:Usable() and ShadowWordPain:Refreshable() and Target.timeToDie > ((-1.2 + 3.3 * Player.enemies) * Player.swp_trait_ranks_check * (1 - 0.012 * SearingDialogue:AzeriteRank() * Player.enemies)) then
+		return ShadowWordPain
+	end
+	if VampiricTouch:Usable() then
+		if VampiricTouch:Refreshable() and Target.timeToDie > ((1 + 3.3 * Player.enemies) * Player.vt_trait_ranks_check * (1 + 0.10 * SearingDialogue:AzeriteRank() * Player.enemies)) then
+			return VampiricTouch
+		end
+		if Misery.known and ShadowWordPain:Refreshable() and Target.timeToDie > ((1 + 2 * Player.enemies) * Player.vt_mis_trait_ranks_check * (Player.vt_mis_sd_check * Player.enemies)) then
+			return VampiricTouch
+		end
+	end
+	if VoidTorrent:Usable() and Voidform:Up() then
+		UseCooldown(VoidTorrent)
+	end
+	if Shadowfiend:Usable() then
+		UseCooldown(Shadowfiend)
+	end
+	if MindSear:Usable() then
+		return MindSear
+	end
+	if MindFlay:Usable() then
+		return MindFlay
+	end
+	if ShadowWordPain:Usable() then
+		return ShadowWordPain
+	end
+end
+
+APL[SPEC.SHADOW].single = function(self)
+--[[
+actions.single=void_eruption
+actions.single+=/dark_ascension,if=buff.voidform.down
+actions.single+=/void_bolt
+actions.single+=/call_action_list,name=cds
+# Use Mind Sear on ST only if you get a Thought Harvester Proc with at least 1 Searing Dialogue Trait.
+actions.single+=/mind_sear,if=buff.harvested_thoughts.up&cooldown.void_bolt.remains>=1.5&azerite.searing_dialogue.rank>=1
+# Use SWD before capping charges, or the target is about to die.
+actions.single+=/shadow_word_death,if=target.time_to_die<3|cooldown.shadow_word_death.charges=2|(cooldown.shadow_word_death.charges=1&cooldown.shadow_word_death.remains<gcd.max)
+actions.single+=/surrender_to_madness,if=buff.voidform.stack>10+(10*buff.bloodlust.up)
+# Use Dark Void on CD unless adds are incoming in 10s or less.
+actions.single+=/dark_void,if=raid_event.adds.in>10
+# Use Mindbender at 19 or more stacks, or if the target will die in less than 15s.
+actions.single+=/mindbender,if=talent.mindbender.enabled|(buff.voidform.stack>18|target.time_to_die<15)
+actions.single+=/shadow_word_death,if=!buff.voidform.up|(cooldown.shadow_word_death.charges=2&buff.voidform.stack<15)
+# Use Shadow Crash on CD unless there are adds incoming.
+actions.single+=/shadow_crash,if=raid_event.adds.in>5&raid_event.adds.duration<20
+# Bank the Shadow Word: Void charges for a bit to try and avoid overcapping on Insanity.
+actions.single+=/mind_blast,if=variable.dots_up&((raid_event.movement.in>cast_time+0.5&raid_event.movement.in<4)|!talent.shadow_word_void.enabled|buff.voidform.down|buff.voidform.stack>14&(insanity<70|charges_fractional>1.33)|buff.voidform.stack<=14&(insanity<60|charges_fractional>1.33))
+actions.single+=/void_torrent,if=dot.shadow_word_pain.remains>4&dot.vampiric_touch.remains>4&buff.voidform.up
+actions.single+=/shadow_word_pain,if=refreshable&target.time_to_die>4&!talent.misery.enabled&!talent.dark_void.enabled
+actions.single+=/vampiric_touch,if=refreshable&target.time_to_die>6|(talent.misery.enabled&dot.shadow_word_pain.refreshable)
+actions.single+=/mind_flay,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2&(cooldown.void_bolt.up|cooldown.mind_blast.up)
+actions.single+=/shadow_word_pain
+]]
+	if VoidEruption:Usable() then
+		UseCooldown(VoidEruption)
+	end
+	if DarkAscension:Usable() and Voidform:Down() then
+		UseCooldown(DarkAscension)
+	end
+	if VoidBolt:Usable() then
+		return VoidBolt
+	end
+	self:cds()
+	if SearingDialogue.known and ThoughtHarvester.known and MindSear:Usable() and ThoughtHarvester:Up() and not Voidbolt:Ready(1.5) then
+		return MindSear
+	end
+	if ShadowWordDeath:Usable() and (Target.timeToDie < 3 or ShadowWordDeath:FullRechargeTime() < Player.gcd) then
+		return ShadowWordDeath
+	end
+	if SurrenderToMadness:Usable() and Voidform:Stack() > (Player:BloodlustActive() and 20 or 10) then
+		UseCooldown(SurrenderToMadness)
+	end
+	if DarkVoid:Usable() then
+		UseCooldown(DarkVoid)
+	end
+	if MindbenderShadow:Usable() then
+		UseCooldown(MindbenderShadow)
+	end
+	if Shadowfiend:Usable() and (Voidform:Stack() > 18 or Target.timeToDie < 15) then
+		UseCooldown(Shadowfiend)
+	end
+	if ShadowWordDeath:Usable() and Voidform:Down() then
+		return ShadowWordDeath
+	end
+	if ShadowCrash:Usable() then
+		UseCooldown(ShadowCrash)
+	end
+	if Player.dots_up then
+		if MindBlast:Usable() then
+			return MindBlast
+		end
+		if ShadowWordVoid:Usable() and (Voidform:Down() or ShadowWordVoid:ChargesFractional() > 1.33 or Player.insanity < (Voidform:Stack() > 14 and 70 or 60)) then
+			return ShadowWordVoid
+		end
+	end
+	if VoidTorrent:Usable() and Voidform:Up() and ShadowWordPain:Remains() > 4 and VampiricTouch:Remains() > 4 then
+		UseCooldown(VoidTorrent)
+	end
+	if not Misery.known and not DarkVoid.known and ShadowWordPain:Usable() and ShadowWordPain:Refreshable() and Target.timeToDie > 4 then
+		return ShadowWordPain
+	end
+	if VampiricTouch:Usable() and ((VampiricTouch:Refreshable() and Target.timeToDie > 6) or (Misery.known and ShadowWordPain:Refreshable())) then
+		return VampiricTouch
+	end
+	if MindFlay:Usable() then
+		return MindFlay
+	end
+	if ShadowWordPain:Usable() then
+		return ShadowWordPain
 	end
 end
 
