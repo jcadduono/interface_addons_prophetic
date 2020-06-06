@@ -2535,16 +2535,23 @@ end
 
 function events:SPELL_UPDATE_COOLDOWN()
 	if Opt.spell_swipe then
-		local _, start, duration, castStart, castEnd
+		local _, start, duration, castStart, castEnd, spellId
 		_, _, _, castStart, castEnd = UnitCastingInfo('player')
 		if castStart then
-			start = castStart / 1000
-			duration = (castEnd - castStart) / 1000
+			-- show time remaining until end of cast
+			start, duration = castStart / 1000, (castEnd - castStart) / 1000
 		else
-			_, _, _, castStart = UnitChannelInfo('player')
+			_, _, _, castStart, castEnd, _, _, spellId = UnitChannelInfo('player')
 			if castStart and Player.main then
-				start, duration = GetSpellCooldown(Player.main.spellId)
+				if spellId == Player.main.spellId then
+					-- show time remaining until end of channel
+					start, duration = castStart / 1000, (castEnd - castStart) / 1000
+				else
+					-- show cooldown time remaining on main ability
+					start, duration = GetSpellCooldown(Player.main.spellId)
+				end
 			else
+				-- show GCD remaining
 				start, duration = GetSpellCooldown(61304)
 			end
 		end
