@@ -2197,9 +2197,10 @@ end
 
 function UI:UpdateCombat()
 	timer.combat = 0
-	local _, start, duration, remains, spellId
+	local _, start, duration, remains, spellId, mainPrevious
 	Player.ctime = GetTime()
 	Player.time = Player.ctime - Player.time_diff
+	mainPrevious = Player.main
 	Player.main =  nil
 	Player.cd = nil
 	Player.interrupt = nil
@@ -2244,6 +2245,9 @@ function UI:UpdateCombat()
 	Player.main = APL[Player.spec]:main()
 	if Player.main then
 		propheticPanel.icon:SetTexture(Player.main.icon)
+		if Player.main ~= mainPrevious then
+			events:SPELL_UPDATE_COOLDOWN()
+		end
 	end
 	if Player.cd then
 		propheticCooldownPanel.icon:SetTexture(Player.cd.icon)
