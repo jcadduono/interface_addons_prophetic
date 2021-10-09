@@ -1591,6 +1591,11 @@ APL[SPEC.DISCIPLINE].main = function(self)
 	if Shadowfiend:Usable() and Target.timeToDie > 15 then
 		UseCooldown(Shadowfiend)
 	end
+	if Trinket1:Usable() then
+		UseCooldown(Trinket1)
+	elseif Trinket2:Usable() then
+		UseCooldown(Trinket2)
+	end
 	if Player.moving and Player.swp:Usable() and Player.swp:Refreshable() then
 		return Player.swp
 	end
