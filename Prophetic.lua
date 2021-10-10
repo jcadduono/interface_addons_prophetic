@@ -784,32 +784,56 @@ end
 
 -- Priest Abilities
 ---- General
-
+local Shoot = Ability:Add({5019}, false, true)
 ---- Discipline
 local PowerWordFortitude = Ability:Add({1243, 1244, 1245, 2791, 10937, 10938, 25389}, true)
 PowerWordFortitude.buff_duration = 1800
 PowerWordFortitude.mana_costs = {20, 70, 200, 300, 450, 600, 700}
+local PowerWordShield = Ability:Add({17, 592, 600, 3747, 6065, 6066, 10898, 10899, 10900, 10901, 25217, 25218}, true)
+PowerWordShield.buff_duration = 30
+PowerWordShield.cooldown_duration = 4
+PowerWordShield.mana_costs = {45, 80, 130, 175, 210, 250, 300, 355, 425, 500, 540, 600}
 local InnerFire = Ability:Add({588, 7128, 602, 1006, 10951, 10952, 25431}, true, true)
 InnerFire.buff_duration = 600
 InnerFire.mana_costs = {30, 65, 105, 165, 235, 315, 375}
+local WeakenedSoul = Ability:Add(6788) -- Debuff applied by Power Word: Shield
+WeakenedSoul.auraTarget = 'player'
+WeakenedSoul.buff_duration = 15
 ------ Talents
-
+local InnerFocus = Ability:Add({14751}, true, true)
+InnerFocus.buff_duration = 600
 ------ Procs
 
 ---- Holy
-
+local HolyFire = Ability:Add({14914, 15262, 15263, 15264, 15265, 15266, 15267, 15261, 25384}, false, true)
+HolyFire.buff_duration = 10
+HolyFire.tick_interval = 2
+HolyFire.mana_costs = {85, 95, 125, 145, 170, 200, 230, 255, 290}
+HolyFire.triggers_combat = true
+local Smite = Ability:Add({585, 591, 598, 984, 1004, 6060, 10933, 10934, 25363, 25364}, false, true)
+Smite.mana_costs = {20, 30, 60, 95, 140, 185, 230, 280, 300, 385}
+Smite.triggers_combat = true
 ------ Talents
 
 ------ Procs
 
 ---- Shadow
-
+local MindBlast = Ability:Add({8092, 8102, 8103, 8104, 8105, 8106, 10945, 10946, 10947, 25372, 25375}, false, true)
+MindBlast.cooldown_duration = 8
+MindBlast.mana_costs = {50, 80, 110, 150, 185, 225, 265, 310, 350, 380, 450}
+MindBlast.triggers_combat = true
+local ShadowWordPain = Ability:Add({589, 594, 970, 992, 2767, 10892, 10893, 10894, 25367, 25368}, false, true)
+ShadowWordPain.buff_duration = 18
+ShadowWordPain.tick_interval = 3
+ShadowWordPain.mana_costs = {25, 50, 95, 155, 230, 305, 385, 470, 510, 575}
+ShadowWordPain.triggers_combat = true
 ------ Talents
 local Silence = Ability:Add(15487)
 Silence.mana_cost = 225
 Silence.max_range = 20
 Silence.buff_duration = 5
 Silence.cooldown_duration = 45
+Silence.triggers_combat = true
 ------ Procs
 
 -- Racials
@@ -1131,7 +1155,26 @@ end
 
 -- Start Ability Modifications
 
+function Ability:ManaCost()
+	if InnerFocus.known and InnerFocus:Up() then
+		return 0
+	end
+	return self.mana_cost
+end
 
+function PowerWordShield:Usable()
+	if WeakenedSoul:Up() then
+		return false
+	end
+	return Ability.Usable(self)
+end
+
+function InnerFocus:Remains()
+	if Player.ability_casting and Player.ability_casting.mana_cost > 0 then
+		return 0
+	end
+	return Ability.Remains(self)
+end
 
 -- End Ability Modifications
 
@@ -1160,11 +1203,37 @@ APL.Main = function(self)
 	if Player:TimeInCombat() == 0 then
 		local apl = self:Buffs(Target.boss and 180 or 30)
 		if apl then return apl end
+		if PowerWordShield:Usable() and PowerWordShield:Remains() < 10 then
+			UseCooldown(PowerWordShield)
+		end
+		if HolyFire:Usable() and HolyFire:Down() then
+			return HolyFire
+		end
 	else
 		local apl = self:Buffs(10)
 		if apl then UseExtra(apl) end
 	end
-
+	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Down() then
+		UseExtra(PowerWordShield)
+	end
+	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 3) then
+		return ShadowWordPain
+	end
+	if InnerFocus:Usable() and MindBlast:Ready() then
+		UseCooldown(InnerFocus)
+	end
+	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() then
+		return MindBlast
+	end
+	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
+		return HolyFire
+	end
+	if Smite:Usable() and Player:ManaPct() > 80 and Target.timeToDie > Smite:CastTime() and (not Player:UnderAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
+		return Smite
+	end
+	if Shoot:Usable() then
+		return Shoot
+	end
 end
 
 APL.Buffs = function(self, remains)
