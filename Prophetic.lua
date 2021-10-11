@@ -834,6 +834,8 @@ Silence.max_range = 20
 Silence.buff_duration = 5
 Silence.cooldown_duration = 45
 Silence.triggers_combat = true
+local SpiritTap = Ability:Add({15270, 15335, 15336, 15337, 15338}, true, true)
+SpiritTap.buff_duration = 15
 ------ Procs
 
 -- Racials
@@ -1228,7 +1230,7 @@ APL.Main = function(self)
 	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
 		return HolyFire
 	end
-	if Smite:Usable() and Player:ManaPct() > 80 and Target.timeToDie > Smite:CastTime() and (not Player:UnderAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
+	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderAttack() or PowerWordShield:Remains() > Smite:CastTime()) and (Player:ManaPct() > 70 or (SpiritTap.known and (SpiritTap:Up() or (SpiritTap.rank >= 4 and Target.timeToDie < 10)))) then
 		return Smite
 	end
 	if Shoot:Usable() then
