@@ -814,7 +814,10 @@ local Smite = Ability:Add({585, 591, 598, 984, 1004, 6060, 10933, 10934, 25363, 
 Smite.mana_costs = {20, 30, 60, 95, 140, 185, 230, 280, 300, 385}
 Smite.triggers_combat = true
 ------ Talents
-
+local SearingLight = Ability:Add({14909, 15017}, false, true)
+local SurgeOfLight = Ability:Add({33150, 33154}, true, true)
+SurgeOfLight.buff = Ability:Add({33151}, true, true)
+SurgeOfLight.buff.buff_duration = 10
 ------ Procs
 
 ---- Shadow
@@ -1090,7 +1093,7 @@ function Target:UpdateHealth()
 	self.health_max = UnitHealthMax('target')
 	table.remove(self.health_array, 1)
 	self.health_array[25] = self.health
-	self.timeToDieMax = self.health / Player.health_max * 12
+	self.timeToDieMax = self.health / Player.health_max * 10
 	self.healthPercentage = self.health_max > 0 and (self.health / self.health_max * 100) or 100
 	self.healthLostPerSec = (self.health_array[1] - self.health) / 5
 	self.timeToDie = self.healthLostPerSec > 0 and min(self.timeToDieMax, self.health / self.healthLostPerSec) or self.timeToDieMax
@@ -1178,6 +1181,13 @@ function InnerFocus:Remains()
 	return Ability.Remains(self)
 end
 
+function Smite:ManaCost()
+	if SurgeOfLight.known and SurgeOfLight.buff:Up() then
+		return 0
+	end
+	return self.mana_cost
+end
+
 -- End Ability Modifications
 
 local function UseCooldown(ability, overwrite)
@@ -1218,20 +1228,26 @@ APL.Main = function(self)
 	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Down() then
 		UseExtra(PowerWordShield)
 	end
-	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 3) then
+	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
 		return ShadowWordPain
 	end
 	if InnerFocus:Usable() and MindBlast:Ready() then
 		UseCooldown(InnerFocus)
 	end
-	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() then
+	if MindBlast:Usable() and (SearingLight.rank < 2 or (InnerFocus.known and InnerFocus:Up())) and Target.timeToDie > MindBlast:CastTime() then
 		return MindBlast
+	end
+	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() then
+		return Smite
 	end
 	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
 		return HolyFire
 	end
-	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderAttack() or PowerWordShield:Remains() > Smite:CastTime()) and (Player:ManaPct() > 70 or (SpiritTap.known and (SpiritTap:Up() or (SpiritTap.rank >= 4 and Target.timeToDie < 10)))) then
+	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderAttack() or PowerWordShield:Remains() > Smite:CastTime()) and (Player:ManaPct() > 70 or (SpiritTap.known and (SpiritTap:Up() or (SpiritTap.rank >= 4 and Target.timeToDie < 12)))) then
 		return Smite
+	end
+	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() then
+		return MindBlast
 	end
 	if Shoot:Usable() then
 		return Shoot
