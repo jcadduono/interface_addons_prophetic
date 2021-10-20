@@ -793,6 +793,9 @@ local PowerWordShield = Ability:Add({17, 592, 600, 3747, 6065, 6066, 10898, 1089
 PowerWordShield.buff_duration = 30
 PowerWordShield.cooldown_duration = 4
 PowerWordShield.mana_costs = {45, 80, 130, 175, 210, 250, 300, 355, 425, 500, 540, 600}
+local PrayerOfFortitude = Ability:Add({21562, 21564, 25392}, true)
+PrayerOfFortitude.buff_duration = 3600
+PrayerOfFortitude.mana_costs = {1200, 1500, 1800}
 local InnerFire = Ability:Add({588, 7128, 602, 1006, 10951, 10952, 25431}, true, true)
 InnerFire.buff_duration = 600
 InnerFire.mana_costs = {30, 65, 105, 165, 235, 315, 375}
@@ -1093,7 +1096,7 @@ function Target:UpdateHealth()
 	self.health_max = UnitHealthMax('target')
 	table.remove(self.health_array, 1)
 	self.health_array[25] = self.health
-	self.timeToDieMax = self.health / Player.health_max * 10
+	self.timeToDieMax = self.health / Player.health_max * 8
 	self.healthPercentage = self.health_max > 0 and (self.health / self.health_max * 100) or 100
 	self.healthLostPerSec = (self.health_array[1] - self.health) / 5
 	self.timeToDie = self.healthLostPerSec > 0 and min(self.timeToDieMax, self.health / self.healthLostPerSec) or self.timeToDieMax
@@ -1174,6 +1177,13 @@ function PowerWordShield:Usable()
 	return Ability.Usable(self)
 end
 
+function InnerFocus:Usable()
+	if Ability.Remains(self) > 0 then
+		return false
+	end
+	return Ability.Usable(self)
+end
+
 function InnerFocus:Remains()
 	if Player.ability_casting and Player.ability_casting.mana_cost > 0 then
 		return 0
@@ -1228,25 +1238,28 @@ APL.Main = function(self)
 	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Down() then
 		UseExtra(PowerWordShield)
 	end
+	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() and (not InnerFocus.known or InnerFocus:Down()) then
+		return Smite
+	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
 		return ShadowWordPain
 	end
-	if InnerFocus:Usable() and MindBlast:Ready() then
+	if InnerFocus:Usable() and SearingLight.rank < 2 and MindBlast:Ready() then
 		UseCooldown(InnerFocus)
 	end
-	if MindBlast:Usable() and (SearingLight.rank < 2 or (InnerFocus.known and InnerFocus:Up())) and Target.timeToDie > MindBlast:CastTime() then
+	if MindBlast:Usable() and SearingLight.rank < 2 and Target.timeToDie > MindBlast:CastTime() then
 		return MindBlast
 	end
-	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() then
-		return Smite
-	end
-	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
+	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
 		return HolyFire
 	end
-	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderAttack() or PowerWordShield:Remains() > Smite:CastTime()) and (Player:ManaPct() > 70 or (SpiritTap.known and (SpiritTap:Up() or (SpiritTap.rank >= 4 and Target.timeToDie < 12)))) then
+	if InnerFocus:Usable() and SearingLight.rank >= 2 and (not SurgeOfLight.known or SurgeOfLight.buff:Down()) then
+		UseCooldown(InnerFocus)
+	end
+	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
 		return Smite
 	end
-	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() then
+	if MindBlast:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
 		return MindBlast
 	end
 	if Shoot:Usable() then
@@ -1255,7 +1268,7 @@ APL.Main = function(self)
 end
 
 APL.Buffs = function(self, remains)
-	if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < remains and PowerWordFortitude:Remains() < remains then
+	if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < remains and PrayerOfFortitude:Remains() < remains then
 		return PowerWordFortitude
 	end
 	if InnerFire:Usable() and InnerFire:Remains() < remains then
