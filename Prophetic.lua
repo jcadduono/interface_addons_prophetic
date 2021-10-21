@@ -736,6 +736,20 @@ function Ability:CastLanded(dstGUID, timeStamp, eventType)
 	end
 end
 
+function Ability:MinDamage()
+	if not self.damage_min then
+		return 0
+	end
+	return self.damage_min[self.rank] + (GetSpellBonusDamage(self.sp_school or 2) * (self.sp_coefficient[self.rank] or 0))
+end
+
+function Ability:MaxDamage()
+	if not self.damage_max then
+		return 0
+	end
+	return self.damage_max[self.rank] + (GetSpellBonusDamage(self.sp_school or 2) * (self.sp_coefficient[self.rank] or 0))
+end
+
 -- Start DoT Tracking
 
 local trackAuras = {}
@@ -812,9 +826,17 @@ local HolyFire = Ability:Add({14914, 15262, 15263, 15264, 15265, 15266, 15267, 1
 HolyFire.buff_duration = 10
 HolyFire.tick_interval = 2
 HolyFire.mana_costs = {85, 95, 125, 145, 170, 200, 230, 255, 290}
+HolyFire.damage_min = {84, 106, 144, 178, 219, 271, 323, 375, 426}
+HolyFire.damage_max = {104, 131, 178, 223, 273, 340, 406, 470, 537}
+HolyFire.sp_coefficient = {0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857}
+HolyFire.sp_school = 2
 HolyFire.triggers_combat = true
 local Smite = Ability:Add({585, 591, 598, 984, 1004, 6060, 10933, 10934, 25363, 25364}, false, true)
 Smite.mana_costs = {20, 30, 60, 95, 140, 185, 230, 280, 300, 385}
+Smite.damage_min = {15, 28, 58, 97, 158, 222, 298, 384, 422, 549}
+Smite.damage_max = {20, 34, 67, 112, 178, 250, 335, 429, 470, 616}
+Smite.sp_coefficient = {0.123, 0.271, 0.554, 0.714, 0.714, 0.714, 0.714, 0.714, 0.714, 0.714}
+Smite.sp_school = 2
 Smite.triggers_combat = true
 ------ Talents
 local SearingLight = Ability:Add({14909, 15017}, false, true)
@@ -827,12 +849,18 @@ SurgeOfLight.buff.buff_duration = 10
 local MindBlast = Ability:Add({8092, 8102, 8103, 8104, 8105, 8106, 10945, 10946, 10947, 25372, 25375}, false, true)
 MindBlast.cooldown_duration = 8
 MindBlast.mana_costs = {50, 80, 110, 150, 185, 225, 265, 310, 350, 380, 450}
+MindBlast.damage_min = {42, 76, 117, 174, 225, 288, 356, 437, 516, 571, 711}
+MindBlast.damage_max = {46, 83, 126, 184, 239, 307, 377, 461, 544, 602, 752}
+MindBlast.sp_coefficient = {0.268, 0.364, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429}
+MindBlast.sp_school = 6
 MindBlast.triggers_combat = true
 local ShadowWordDeath = Ability:Add({32379, 32996}, false, true)
 ShadowWordDeath.cooldown_duration = 12
 ShadowWordDeath.mana_costs = {243, 309}
-ShadowWordDeath.min_damage = {450, 572}
-ShadowWordDeath.sp_coefficient = 0.429
+ShadowWordDeath.damage_min = {450, 572}
+ShadowWordDeath.damage_max = {522, 664}
+ShadowWordDeath.sp_coefficient = {0.429, 0.429}
+ShadowWordDeath.sp_school = 6
 ShadowWordDeath.triggers_combat = true
 local ShadowWordPain = Ability:Add({589, 594, 970, 992, 2767, 10892, 10893, 10894, 25367, 25368}, false, true)
 ShadowWordPain.buff_duration = 18
@@ -1165,6 +1193,14 @@ function Target:Update()
 	end
 end
 
+function Target:Health()
+	local health = self.health
+	if Player.ability_casting then
+		health = health - Player.ability_casting:MinDamage()
+	end
+	return max(0, health)
+end
+
 -- End Target API
 
 -- Start Ability Modifications
@@ -1202,10 +1238,6 @@ function Smite:ManaCost()
 		return 0
 	end
 	return self.mana_cost
-end
-
-function ShadowWordDeath:Damage()
-	return self.min_damage[self.rank] + (GetSpellBonusDamage(6) * self.sp_coefficient)
 end
 
 -- End Ability Modifications
@@ -1251,7 +1283,7 @@ APL.Main = function(self)
 	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() then
 		return Smite
 	end
-	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target.health < ShadowWordDeath:Damage()) then
+	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage()) then
 		return ShadowWordDeath
 	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
