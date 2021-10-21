@@ -828,6 +828,12 @@ local MindBlast = Ability:Add({8092, 8102, 8103, 8104, 8105, 8106, 10945, 10946,
 MindBlast.cooldown_duration = 8
 MindBlast.mana_costs = {50, 80, 110, 150, 185, 225, 265, 310, 350, 380, 450}
 MindBlast.triggers_combat = true
+local ShadowWordDeath = Ability:Add({32379, 32996}, false, true)
+ShadowWordDeath.cooldown_duration = 12
+ShadowWordDeath.mana_costs = {243, 309}
+ShadowWordDeath.min_damage = {450, 572}
+ShadowWordDeath.sp_coefficient = 0.429
+ShadowWordDeath.triggers_combat = true
 local ShadowWordPain = Ability:Add({589, 594, 970, 992, 2767, 10892, 10893, 10894, 25367, 25368}, false, true)
 ShadowWordPain.buff_duration = 18
 ShadowWordPain.tick_interval = 3
@@ -1096,7 +1102,7 @@ function Target:UpdateHealth()
 	self.health_max = UnitHealthMax('target')
 	table.remove(self.health_array, 1)
 	self.health_array[25] = self.health
-	self.timeToDieMax = self.health / Player.health_max * 8
+	self.timeToDieMax = self.health / Player.health_max * 10
 	self.healthPercentage = self.health_max > 0 and (self.health / self.health_max * 100) or 100
 	self.healthLostPerSec = (self.health_array[1] - self.health) / 5
 	self.timeToDie = self.healthLostPerSec > 0 and min(self.timeToDieMax, self.health / self.healthLostPerSec) or self.timeToDieMax
@@ -1198,6 +1204,10 @@ function Smite:ManaCost()
 	return self.mana_cost
 end
 
+function ShadowWordDeath:Damage()
+	return self.min_damage[self.rank] + (GetSpellBonusDamage(6) * self.sp_coefficient)
+end
+
 -- End Ability Modifications
 
 local function UseCooldown(ability, overwrite)
@@ -1235,11 +1245,14 @@ APL.Main = function(self)
 		local apl = self:Buffs(10)
 		if apl then UseExtra(apl) end
 	end
-	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Down() then
+	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Remains() < Smite:CastTime() then
 		UseExtra(PowerWordShield)
 	end
-	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() and (not InnerFocus.known or InnerFocus:Down()) then
+	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() then
 		return Smite
+	end
+	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target.health < ShadowWordDeath:Damage()) then
+		return ShadowWordDeath
 	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
 		return ShadowWordPain
@@ -1253,7 +1266,7 @@ APL.Main = function(self)
 	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
 		return HolyFire
 	end
-	if InnerFocus:Usable() and SearingLight.rank >= 2 and (not SurgeOfLight.known or SurgeOfLight.buff:Down()) then
+	if InnerFocus:Usable() and SearingLight.rank >= 2 then
 		UseCooldown(InnerFocus)
 	end
 	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
