@@ -831,6 +831,9 @@ HolyFire.damage_max = {104, 131, 178, 223, 273, 340, 406, 470, 537}
 HolyFire.sp_coefficient = {0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857}
 HolyFire.sp_school = 2
 HolyFire.triggers_combat = true
+local PrayerOfMending = Ability:Add({33076}, true)
+PrayerOfMending.mana_costs = {390}
+PrayerOfMending.buff_duration = 30
 local Smite = Ability:Add({585, 591, 598, 984, 1004, 6060, 10933, 10934, 25363, 25364}, false, true)
 Smite.mana_costs = {20, 30, 60, 95, 140, 185, 230, 280, 300, 385}
 Smite.damage_min = {15, 28, 58, 97, 158, 222, 298, 384, 422, 549}
@@ -1270,6 +1273,9 @@ APL.Main = function(self)
 		if PowerWordShield:Usable() and PowerWordShield:Remains() < 10 then
 			UseCooldown(PowerWordShield)
 		end
+		if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() and SurgeOfLight.buff:Remains() < 5 then
+			return Smite
+		end
 		if HolyFire:Usable() and HolyFire:Down() then
 			return HolyFire
 		end
@@ -1283,7 +1289,7 @@ APL.Main = function(self)
 	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() then
 		return Smite
 	end
-	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage()) then
+	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage() or (Player.group_size > 1 and PrayerOfMending:Up() and not Player:UnderAttack())) then
 		return ShadowWordDeath
 	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
