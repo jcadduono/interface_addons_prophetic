@@ -831,9 +831,10 @@ HolyFire.damage_max = {104, 131, 178, 223, 273, 340, 406, 470, 537}
 HolyFire.sp_coefficient = {0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857, 0.857}
 HolyFire.sp_school = 2
 HolyFire.triggers_combat = true
-local PrayerOfMending = Ability:Add({33076}, true)
+local PrayerOfMending = Ability:Add({33076}, true, true)
 PrayerOfMending.mana_costs = {390}
-PrayerOfMending.buff_duration = 30
+PrayerOfMending.buff = Ability:Add({41635}, true)
+PrayerOfMending.buff.buff_duration = 30
 local Smite = Ability:Add({585, 591, 598, 984, 1004, 6060, 10933, 10934, 25363, 25364}, false, true)
 Smite.mana_costs = {20, 30, 60, 95, 140, 185, 230, 280, 300, 385}
 Smite.damage_min = {15, 28, 58, 97, 158, 222, 298, 384, 422, 549}
@@ -857,6 +858,10 @@ MindBlast.damage_max = {46, 83, 126, 184, 239, 307, 377, 461, 544, 602, 752}
 MindBlast.sp_coefficient = {0.268, 0.364, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429, 0.429}
 MindBlast.sp_school = 6
 MindBlast.triggers_combat = true
+local Shadowfiend = Ability:Add({34433}, false, true)
+Shadowfiend.buff_duration = 15
+Shadowfiend.cooldown_duration = 300
+Shadowfiend.mana_cost_pct = 6
 local ShadowWordDeath = Ability:Add({32379, 32996}, false, true)
 ShadowWordDeath.cooldown_duration = 12
 ShadowWordDeath.mana_costs = {243, 309}
@@ -1038,6 +1043,8 @@ function Player:UpdateAbilities()
 		end
 		ability.name, _, ability.icon = GetSpellInfo(ability.spellId)
 	end
+
+	PrayerOfMending.buff.known = PrayerOfMending.known
 
 	abilities.bySpellId = {}
 	abilities.velocity = {}
@@ -1286,10 +1293,13 @@ APL.Main = function(self)
 	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Remains() < Smite:CastTime() then
 		UseExtra(PowerWordShield)
 	end
+	if Shadowfiend:Usable() and Player:ManaPct() < 30 and (Target.timeToDie > 15 or Player.enemies > 1) then
+		UseCooldown(Shadowfiend)
+	end
 	if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() then
 		return Smite
 	end
-	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage() or (Player.group_size > 1 and PrayerOfMending:Up() and not Player:UnderAttack())) then
+	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage() or (Player.group_size > 1 and PrayerOfMending.buff:Up() and not Player:UnderAttack())) then
 		return ShadowWordDeath
 	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
