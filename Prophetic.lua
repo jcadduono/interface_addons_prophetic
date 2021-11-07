@@ -1352,7 +1352,39 @@ APL.HolyDisc = function(self)
 end
 
 APL.Shadow = function(self)
-
+	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Remains() < Smite:CastTime() then
+		UseExtra(PowerWordShield)
+	end
+	if Shadowfiend:Usable() and Player:ManaPct() < 30 and (Target.timeToDie > 15 or Player.enemies > 1) then
+		UseCooldown(Shadowfiend)
+	end
+	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage()) then
+		return ShadowWordDeath
+	end
+	if VampiricTouch:Usable() and VampiricTouch:Remains() < VampiricTouch:CastTime() and Target.timeToDie > (VampiricTouch:TickTime() * 2) then
+		return VampiricTouch
+	end
+	if InnerFocus:Usable() and Player:ManaPct() < 15 and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
+		UseCooldown(InnerFocus)
+	end
+	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 3) then
+		return ShadowWordPain
+	end
+	if InnerFocus:Usable() and MindBlast:Ready() then
+		UseCooldown(InnerFocus)
+	end
+	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() then
+		return MindBlast
+	end
+	if ShadowWordDeath:Usable() and Player:Health() > ShadowWordDeath:MaxDamage() * 2 and not Player:UnderAttack() then
+		return ShadowWordDeath
+	end
+	if MindFlay:Usable() then
+		return MindFlay
+	end
+	if Shoot:Usable() then
+		return Shoot
+	end
 end
 
 APL.Buffs = function(self, remains)
