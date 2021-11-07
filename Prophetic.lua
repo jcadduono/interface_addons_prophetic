@@ -876,6 +876,14 @@ ShadowWordPain.tick_interval = 3
 ShadowWordPain.mana_costs = {25, 50, 95, 155, 230, 305, 385, 470, 510, 575}
 ShadowWordPain.triggers_combat = true
 ------ Talents
+local MindFlay = Ability:Add({15407, 17311, 17312, 17313, 17314, 18807, 25387}, false, true)
+MindFlay.mana_costs = {45, 70, 100, 135, 165, 205, 230}
+MindFlay.buff_duration = 3
+MindFlay.tick_interval = 1
+MindFlay.sp_school = 6
+MindFlay.triggers_combat = true
+local Shadowform = Ability:Add({15473}, true, true)
+Shadowform.mana_cost_pct = 32
 local Silence = Ability:Add(15487)
 Silence.mana_cost = 225
 Silence.max_range = 20
@@ -884,6 +892,12 @@ Silence.cooldown_duration = 45
 Silence.triggers_combat = true
 local SpiritTap = Ability:Add({15270, 15335, 15336, 15337, 15338}, true, true)
 SpiritTap.buff_duration = 15
+local VampiricTouch = Ability:Add({34914, 34916, 34917}, false, true)
+VampiricTouch.mana_costs = {325, 400, 425}
+VampiricTouch.buff_duration = 15
+VampiricTouch.tick_interval = 3
+VampiricTouch.sp_school = 6
+VampiricTouch.triggers_combat = true
 ------ Procs
 
 -- Racials
@@ -1280,15 +1294,24 @@ APL.Main = function(self)
 		if PowerWordShield:Usable() and PowerWordShield:Remains() < 10 then
 			UseCooldown(PowerWordShield)
 		end
+	else
+		local apl = self:Buffs(10)
+		if apl then UseExtra(apl) end
+	end
+	if MindFlay.known then
+		return self:Shadow()
+	end
+	return self:HolyDisc()
+end
+
+APL.HolyDisc = function(self)
+	if Player:TimeInCombat() == 0 then
 		if SurgeOfLight.known and Smite:Usable() and SurgeOfLight.buff:Up() and SurgeOfLight.buff:Remains() < 5 then
 			return Smite
 		end
 		if HolyFire:Usable() and HolyFire:Down() then
 			return HolyFire
 		end
-	else
-		local apl = self:Buffs(10)
-		if apl then UseExtra(apl) end
 	end
 	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Remains() < Smite:CastTime() then
 		UseExtra(PowerWordShield)
@@ -1326,6 +1349,10 @@ APL.Main = function(self)
 	if Shoot:Usable() then
 		return Shoot
 	end
+end
+
+APL.Shadow = function(self)
+
 end
 
 APL.Buffs = function(self, remains)
