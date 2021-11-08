@@ -736,20 +736,6 @@ function Ability:CastLanded(dstGUID, timeStamp, eventType)
 	end
 end
 
-function Ability:MinDamage()
-	if not self.damage_min then
-		return 0
-	end
-	return self.damage_min[self.rank] + (GetSpellBonusDamage(self.sp_school or 2) * (self.sp_coefficient[self.rank] or 0))
-end
-
-function Ability:MaxDamage()
-	if not self.damage_max then
-		return 0
-	end
-	return self.damage_max[self.rank] + (GetSpellBonusDamage(self.sp_school or 2) * (self.sp_coefficient[self.rank] or 0))
-end
-
 -- Start DoT Tracking
 
 local trackAuras = {}
@@ -876,12 +862,16 @@ ShadowWordPain.tick_interval = 3
 ShadowWordPain.mana_costs = {25, 50, 95, 155, 230, 305, 385, 470, 510, 575}
 ShadowWordPain.triggers_combat = true
 ------ Talents
+local Darkness = Ability:Add({15259, 15307, 15308, 15309, 15310}, true, true)
 local MindFlay = Ability:Add({15407, 17311, 17312, 17313, 17314, 18807, 25387}, false, true)
 MindFlay.mana_costs = {45, 70, 100, 135, 165, 205, 230}
 MindFlay.buff_duration = 3
 MindFlay.tick_interval = 1
 MindFlay.sp_school = 6
 MindFlay.triggers_combat = true
+local Misery = Ability:Add({33191, 33192, 33193, 33194, 33195}, false, true)
+Misery.debuff = Ability:Add({33196, 33197, 33198, 33199, 33200})
+Misery.debuff.buff_duration = 24
 local Shadowform = Ability:Add({15473}, true, true)
 Shadowform.mana_cost_pct = 32
 local Silence = Ability:Add(15487)
@@ -903,8 +893,12 @@ VampiricTouch.triggers_combat = true
 -- Racials
 
 -- Class Debuffs
-local ShadowVulnerability = Ability:Add(15258)
-ShadowVulnerability.buff_duration = 15
+local CurseOfTheElements = Ability:Add({27228})
+CurseOfTheElements.buff_duration = 300
+local ShadowVulnerabilityWarlock = Ability:Add({17800}) -- Destruction Warlock Improved Shadow Bolt talent
+ShadowVulnerabilityWarlock.buff_duration = 12
+local ShadowVulnerabilityPriest = Ability:Add(15258) -- Shadow Priest Shadow Weaving talent
+ShadowVulnerabilityPriest.buff_duration = 15
 -- Trinket Effects
 
 -- End Abilities
@@ -1237,6 +1231,42 @@ function Ability:ManaCost()
 	return self.mana_cost
 end
 
+function Ability:CalculateBonusDamage(base)
+	local damage = base
+	if self.sp_coefficient then
+		damage = damage + (GetSpellBonusDamage(self.sp_school or 2) * self.sp_coefficient[self.rank])
+	end
+	if self.sp_school == 6 then
+		if Darkness.known then
+			damage = damage * (1 + (0.02 * Darkness.rank))
+		end
+		if Shadowform:Up() then
+			damage = damage * 1.15
+		end
+		if ShadowVulnerabilityPriest:Up() then
+			damage = damage * (1 + (0.02 * ShadowVulnerabilityPriest:Stack()))
+		end
+		if ShadowVulnerabilityWarlock:Up() then
+			damage = damage * 1.20
+		end
+		if CurseOfTheElements:Up() then
+			damage = damage * 1.10
+		end
+	end
+	if Misery.debuff:Up() then
+		damage = damage * (1 + (0.01 * Misery.rank))
+	end
+	return damage
+end
+
+function Ability:MinDamage()
+	return self.damage_min and self:CalculateBonusDamage(self.damage_min[self.rank]) or 0
+end
+
+function Ability:MaxDamage()
+	return self.damage_max and self:CalculateBonusDamage(self.damage_max[self.rank]) or 0
+end
+
 function PowerWordShield:Usable()
 	if WeakenedSoul:Up() then
 		return false
@@ -1367,7 +1397,7 @@ APL.Shadow = function(self)
 		Player.clip_flay_early = true
 		return ShadowWordDeath
 	end
-	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() and ShadowVulnerability:Stack() >= 5 and ShadowVulnerability:Remains() > MindBlast:CastTime() then
+	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() and ShadowVulnerabilityPriest:Stack() >= 5 and ShadowVulnerabilityPriest:Remains() > MindBlast:CastTime() then
 		if InnerFocus:Usable() then
 			UseCooldown(InnerFocus)
 		end
