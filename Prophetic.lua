@@ -903,7 +903,8 @@ VampiricTouch.triggers_combat = true
 -- Racials
 
 -- Class Debuffs
-
+local ShadowVulnerability = Ability:Add(15258)
+ShadowVulnerability.buff_duration = 15
 -- Trinket Effects
 
 -- End Abilities
@@ -1090,7 +1091,7 @@ function Player:Update()
 	self.cd = nil
 	self.interrupt = nil
 	self.extra = nil
-	self.wait_seconds = nil
+	self.clip_flay_early = false
 	start, duration = GetSpellCooldown(47524)
 	self.gcd_remains = start > 0 and duration - (self.ctime - start) or 0
 	_, _, _, _, remains, _, _, spellId = UnitCastingInfo('player')
@@ -1278,11 +1279,6 @@ local function UseExtra(ability, overwrite)
 	end
 end
 
-local function WaitForDrop(ability)
-	Player.wait_seconds = ability:Remains()
-	return ability
-end
-
 -- Begin Action Priority Lists
 
 local APL = {}
@@ -1352,6 +1348,15 @@ APL.HolyDisc = function(self)
 end
 
 APL.Shadow = function(self)
+	if Player:TimeInCombat() == 0 then
+		if Shadowform:Down() then
+			return Shadowform
+		end
+	else
+		if Shadowform:Down() then
+			UseCooldown(Shadowform)
+		end
+	end
 	if PowerWordShield:Usable() and Player:UnderAttack() and PowerWordShield:Remains() < Smite:CastTime() then
 		UseExtra(PowerWordShield)
 	end
@@ -1359,24 +1364,31 @@ APL.Shadow = function(self)
 		UseCooldown(Shadowfiend)
 	end
 	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage()) then
+		Player.clip_flay_early = true
 		return ShadowWordDeath
+	end
+	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() and ShadowVulnerability:Stack() >= 5 and ShadowVulnerability:Remains() > MindBlast:CastTime() then
+		if InnerFocus:Usable() then
+			UseCooldown(InnerFocus)
+		end
+		return MindBlast
 	end
 	if VampiricTouch:Usable() and VampiricTouch:Remains() < VampiricTouch:CastTime() and Target.timeToDie > (VampiricTouch:TickTime() * 2) then
 		return VampiricTouch
 	end
-	if InnerFocus:Usable() and Player:ManaPct() < 15 and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
-		UseCooldown(InnerFocus)
-	end
-	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 3) then
+	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 2) then
+		if InnerFocus:Usable() and Player:ManaPct() < 15 and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
+			UseCooldown(InnerFocus)
+		end
 		return ShadowWordPain
 	end
-	if InnerFocus:Usable() and MindBlast:Ready() then
-		UseCooldown(InnerFocus)
-	end
 	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() then
+		if InnerFocus:Usable() then
+			UseCooldown(InnerFocus)
+		end
 		return MindBlast
 	end
-	if ShadowWordDeath:Usable() and Player:Health() > ShadowWordDeath:MaxDamage() * 2 and not Player:UnderAttack() then
+	if ShadowWordDeath:Usable() and Player.health > ShadowWordDeath:MaxDamage() * 2 and not Player:UnderAttack() then
 		return ShadowWordDeath
 	end
 	if MindFlay:Usable() then
@@ -1570,6 +1582,20 @@ function UI:Disappear()
 	UI:UpdateGlows()
 end
 
+function events:UNIT_SPELLCAST_CHANNEL_START(srcName, castGUID, spellId)
+	if srcName ~= 'player' then
+		return
+	end
+	if MindFlay.known and MindFlay:Match(spellId) then
+		local _, start, ends
+		_, _, _, start, ends = UnitChannelInfo('player')
+		MindFlay.start_time = start / 1000
+		MindFlay.end_time = ends / 1000
+		MindFlay.active_tick_interval = (MindFlay.end_time - MindFlay.start_time) / 3
+		MindFlay.second_tick = MindFlay.active_tick_interval * 2
+	end
+end
+
 function UI:UpdateDisplay()
 	timer.display = 0
 	local dim, dim_cd, text_center
@@ -1581,9 +1607,11 @@ function UI:UpdateDisplay()
 		           (Player.cd.spellId and IsUsableSpell(Player.cd.spellId)) or
 		           (Player.cd.itemId and IsUsableItem(Player.cd.itemId)))
 	end
-	if Player.wait_seconds then
-		text_center = format('WAIT\n%.1fs', Player.wait_seconds)
-		dim = Opt.dimmer
+	if MindFlay.known and Player.main ~= MindFlay and MindFlay:Channeling() and not Player.clip_flay_early then
+		if MindFlay.start_time + MindFlay.second_tick > GetTime() then
+			text_center = format('CLIP\n%.1fs', (MindFlay.start_time + MindFlay.second_tick) - GetTime())
+			dim = Opt.dimmer
+		end
 	end
 	if Player.main and Player.main_freecast then
 		if not propheticPanel.freeCastOverlayOn then
