@@ -868,6 +868,8 @@ MindFlay.mana_costs = {45, 70, 100, 135, 165, 205, 230}
 MindFlay.buff_duration = 3
 MindFlay.tick_interval = 1
 MindFlay.sp_school = 6
+MindFlay.start_time = 0
+MindFlay.end_time = 0
 MindFlay.triggers_combat = true
 local Misery = Ability:Add({33191, 33192, 33193, 33194, 33195}, false, true)
 Misery.debuff = Ability:Add({33196, 33197, 33198, 33199, 33200})
@@ -882,6 +884,10 @@ Silence.cooldown_duration = 45
 Silence.triggers_combat = true
 local SpiritTap = Ability:Add({15270, 15335, 15336, 15337, 15338}, true, true)
 SpiritTap.buff_duration = 15
+local VampiricEmbrace = Ability:Add({15286}, false, true)
+VampiricEmbrace.buff_duration = 60
+VampiricEmbrace.cooldown_duration = 10
+VampiricEmbrace.mana_cost_pct = 2
 local VampiricTouch = Ability:Add({34914, 34916, 34917}, false, true)
 VampiricTouch.mana_costs = {325, 400, 425}
 VampiricTouch.buff_duration = 15
@@ -1078,7 +1084,7 @@ function Player:UpdateAbilities()
 end
 
 function Player:Update()
-	local _, start, duration, remains, spellId, speed, max_speed, threat, threat_pct
+	local _, start, ends, duration, spellId, speed, max_speed, threat, threat_pct
 	self.ctime = GetTime()
 	self.time = self.ctime - self.time_diff
 	self.main =  nil
@@ -1088,9 +1094,17 @@ function Player:Update()
 	self.clip_flay_early = false
 	start, duration = GetSpellCooldown(47524)
 	self.gcd_remains = start > 0 and duration - (self.ctime - start) or 0
-	_, _, _, _, remains, _, _, spellId = UnitCastingInfo('player')
+	_, _, _, _, ends, _, _, spellId = UnitCastingInfo('player')
 	self.ability_casting = abilities.bySpellId[spellId]
-	self.execute_remains = max(remains and (remains / 1000 - self.ctime) or 0, self.gcd_remains)
+	self.execute_remains = max(self.gcd_remains, ends and (ends / 1000 - self.ctime) or 0)
+	if not spellId and MindFlay.known and MindFlay.end_time > self.ctime then
+		if MindFlay.start_time + MindFlay.second_tick > self.ctime then
+			ends = MindFlay.start_time + MindFlay.second_tick
+		else
+			ends = MindFlay.end_time
+		end
+		self.execute_remains = max(self.gcd_remains, ends - self.ctime)
+	end
 	self.haste_factor = 1 / (1 + GetCombatRatingBonus(CR_HASTE_SPELL) / 100)
 	self.gcd = 1.5 * self.haste_factor
 	self.health = UnitHealth('player')
@@ -1393,11 +1407,11 @@ APL.Shadow = function(self)
 	if Shadowfiend:Usable() and Player:ManaPct() < 30 and (Target.timeToDie > 15 or Player.enemies > 1) then
 		UseCooldown(Shadowfiend)
 	end
-	if ShadowWordDeath:Usable() and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage()) then
+	if ShadowWordDeath:Usable(0.5 * Player.haste_factor) and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage()) then
 		Player.clip_flay_early = true
 		return ShadowWordDeath
 	end
-	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() and ShadowVulnerabilityPriest:Stack() >= 5 and ShadowVulnerabilityPriest:Remains() > MindBlast:CastTime() then
+	if MindBlast:Usable(0.5 * Player.haste_factor) and Target.timeToDie > MindBlast:CastTime() and ShadowVulnerabilityPriest:Stack() >= 5 and ShadowVulnerabilityPriest:Remains() > MindBlast:CastTime() then
 		if InnerFocus:Usable() then
 			UseCooldown(InnerFocus)
 		end
@@ -1412,14 +1426,17 @@ APL.Shadow = function(self)
 		end
 		return ShadowWordPain
 	end
-	if MindBlast:Usable() and Target.timeToDie > MindBlast:CastTime() then
+	if MindBlast:Usable(0.5 * Player.haste_factor) and Target.timeToDie > MindBlast:CastTime() then
 		if InnerFocus:Usable() then
 			UseCooldown(InnerFocus)
 		end
 		return MindBlast
 	end
-	if ShadowWordDeath:Usable() and Player.health > ShadowWordDeath:MaxDamage() * 2 and not Player:UnderAttack() then
+	if ShadowWordDeath:Usable(0.5 * Player.haste_factor) and Player.health > ShadowWordDeath:MaxDamage() * 2 and not Player:UnderAttack() then
 		return ShadowWordDeath
+	end
+	if VampiricEmbrace:Usable() and (Target.boss or Target.timeToDie > 30) and VampiricEmbrace:Remains() < 4 then
+		UseExtra(VampiricEmbrace)
 	end
 	if MindFlay:Usable() then
 		return MindFlay
@@ -1612,19 +1629,25 @@ function UI:Disappear()
 	UI:UpdateGlows()
 end
 
-function events:UNIT_SPELLCAST_CHANNEL_START(srcName, castGUID, spellId)
+function events:UNIT_SPELLCAST_CHANNEL_UPDATE(srcName, castGUID, spellId)
 	if srcName ~= 'player' then
 		return
 	end
 	if MindFlay.known and MindFlay:Match(spellId) then
-		local _, start, ends
-		_, _, _, start, ends = UnitChannelInfo('player')
-		MindFlay.start_time = start / 1000
-		MindFlay.end_time = ends / 1000
-		MindFlay.active_tick_interval = (MindFlay.end_time - MindFlay.start_time) / 3
-		MindFlay.second_tick = MindFlay.active_tick_interval * 2
+		local _, _, _, start, ends = UnitChannelInfo('player')
+		if start then
+			MindFlay.start_time = start / 1000
+			MindFlay.end_time = ends / 1000
+			MindFlay.active_tick_interval = (MindFlay.end_time - MindFlay.start_time) / 3
+			MindFlay.second_tick = MindFlay.active_tick_interval * 2
+		else
+			MindFlay.start_time = 0
+			MindFlay.end_time = 0
+		end
 	end
 end
+events.UNIT_SPELLCAST_CHANNEL_START = events.UNIT_SPELLCAST_CHANNEL_UPDATE
+events.UNIT_SPELLCAST_CHANNEL_STOP = events.UNIT_SPELLCAST_CHANNEL_UPDATE
 
 function UI:UpdateDisplay()
 	timer.display = 0
