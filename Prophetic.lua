@@ -1366,19 +1366,16 @@ APL.HolyDisc = function(self)
 		return ShadowWordDeath
 	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
+		if InnerFocus:Usable() then
+			UseCooldown(InnerFocus)
+		end
 		return ShadowWordPain
-	end
-	if InnerFocus:Usable() and SearingLight.rank < 2 and MindBlast:Ready() then
-		UseCooldown(InnerFocus)
 	end
 	if MindBlast:Usable() and SearingLight.rank < 2 and Target.timeToDie > MindBlast:CastTime() then
 		return MindBlast
 	end
 	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
 		return HolyFire
-	end
-	if InnerFocus:Usable() and SearingLight.rank >= 2 then
-		UseCooldown(InnerFocus)
 	end
 	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
 		return Smite
@@ -1412,7 +1409,7 @@ APL.Shadow = function(self)
 		return ShadowWordDeath
 	end
 	if MindBlast:Usable(0.5 * Player.haste_factor) and Target.timeToDie > MindBlast:CastTime() and ShadowVulnerabilityPriest:Stack() >= 5 and ShadowVulnerabilityPriest:Remains() > MindBlast:CastTime() then
-		if InnerFocus:Usable() then
+		if InnerFocus:Usable() and Target.timeToDie < (ShadowWordPain:Remains() + ShadowWordPain:TickTime() * 4) then
 			UseCooldown(InnerFocus)
 		end
 		return MindBlast
@@ -1421,15 +1418,12 @@ APL.Shadow = function(self)
 		return VampiricTouch
 	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 2) then
-		if InnerFocus:Usable() and Player:ManaPct() < 15 and Target.timeToDie > (ShadowWordPain:TickTime() * 4) then
+		if InnerFocus:Usable() then
 			UseCooldown(InnerFocus)
 		end
 		return ShadowWordPain
 	end
 	if MindBlast:Usable(0.5 * Player.haste_factor) and Target.timeToDie > MindBlast:CastTime() then
-		if InnerFocus:Usable() then
-			UseCooldown(InnerFocus)
-		end
 		return MindBlast
 	end
 	if ShadowWordDeath:Usable(0.5 * Player.haste_factor) and Player.health > ShadowWordDeath:MaxDamage() * 2 and not Player:UnderAttack() then
