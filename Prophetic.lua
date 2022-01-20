@@ -1094,7 +1094,7 @@ function Player:Update()
 	self.clip_flay_early = false
 	start, duration = GetSpellCooldown(47524)
 	self.gcd_remains = start > 0 and duration - (self.ctime - start) or 0
-	_, _, _, _, ends, _, _, spellId = UnitCastingInfo('player')
+	_, _, _, _, ends, _, _, _, spellId = UnitCastingInfo('player')
 	self.ability_casting = abilities.bySpellId[spellId]
 	self.execute_remains = max(self.gcd_remains, ends and (ends / 1000 - self.ctime) or 0)
 	if not spellId and MindFlay.known and MindFlay.end_time > self.ctime then
