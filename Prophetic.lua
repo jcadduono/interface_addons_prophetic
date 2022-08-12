@@ -882,23 +882,20 @@ function Ability:ApplyAura(guid)
 	self.aura_targets[guid] = aura
 end
 
-function Ability:RefreshAura(guid)
-	if autoAoe.blacklist[guid] then
-		return
-	end
+function Ability:RefreshAura(guid, seconds)
 	local aura = self.aura_targets[guid]
 	if not aura then
 		self:ApplyAura(guid)
 		return
 	end
 	local duration = self:Duration()
-	aura.expires = Player.time + min(duration * 1.3, (aura.expires - Player.time) + duration)
+	aura.expires = Player.time + min(duration * 1.3, (aura.expires - Player.time) + (seconds or duration))
 end
 
-function Ability:RefreshAuraAll()
+function Ability:RefreshAuraAll(seconds)
 	local duration = self:Duration()
 	for guid, aura in next, self.aura_targets do
-		aura.expires = Player.time + min(duration * 1.3, (aura.expires - Player.time) + duration)
+		aura.expires = Player.time + min(duration * 1.3, (aura.expires - Player.time) + (seconds or duration))
 	end
 end
 
@@ -955,6 +952,7 @@ ShadowWordPain.buff_duration = 16
 ShadowWordPain.tick_interval = 2
 ShadowWordPain.hasted_ticks = true
 ShadowWordPain.insanity_gain = 4
+ShadowWordPain:AutoAoe(false, 'apply')
 ShadowWordPain:TrackAuras()
 local Smite = Ability:Add(585, false, true, 208772)
 Smite.mana_cost = 0.2
@@ -1014,6 +1012,7 @@ PurgeTheWicked.buff_duration = 20
 PurgeTheWicked.mana_cost = 1.8
 PurgeTheWicked.tick_interval = 2
 PurgeTheWicked.hasted_ticks = true
+PurgeTheWicked:AutoAoe(false, 'apply')
 local PowerWordSolace = Ability:Add(129250, false, true)
 local Schism = Ability:Add(214621, false, true)
 Schism.buff_duration = 9
@@ -1059,9 +1058,17 @@ MindBlast.insanity_gain = 9
 MindBlast.hasted_cooldown = true
 MindBlast.requires_charge = true
 local MindFlay = Ability:Add(15407, false, true)
-MindFlay.buff_duration = 4
+MindFlay.buff_duration = 4.5
+MindFlay.tick_interval = 0.75
+MindFlay.hasted_duration = true
+MindFlay.hasted_ticks = true
 local MindSear = Ability:Add(48045, false, true)
-MindSear.buff_duration = 4
+MindSear.buff_duration = 4.5
+MindSear.tick_interval = 0.75
+MindSear.hasted_duration = true
+MindSear.hasted_ticks = true
+MindSear.damage = Ability:Add(49821, false, true)
+MindSear.damage:AutoAoe(true)
 local Shadowform = Ability:Add(232698, true, true)
 local ShadowWordDeath = Ability:Add(32379, false, true)
 ShadowWordDeath.mana_cost = 0.5
@@ -1076,6 +1083,7 @@ VampiricTouch.tick_interval = 3
 VampiricTouch.hasted_ticks = true
 VampiricTouch.insanity_gain = 5
 VampiricTouch:TrackAuras()
+VampiricTouch:AutoAoe(false, 'apply')
 local VoidBolt = Ability:Add(205448, false, true)
 VoidBolt.cooldown_duration = 4.5
 VoidBolt.insanity_gain = 12
@@ -1117,7 +1125,7 @@ DarkThought.buff_duration = 10
 local LivingShadow = Ability:Add(363469, false, true) -- T28 4 piece
 -- Covenant abilities
 local FirstStrike = Ability:Add(325069, true, true, 325381) -- Night Fae (Korayn Soulbind)
-local Fleshcraft = Ability:Add(324631, true, true) -- Necrolord
+local Fleshcraft = Ability:Add(324631, true, true, 324867) -- Necrolord
 Fleshcraft.buff_duration = 120
 Fleshcraft.cooldown_duration = 120
 local LeadByExample = Ability:Add(342156, true, true, 342181) -- Necrolord (Emeni Soulbind)
@@ -1132,6 +1140,7 @@ local UnholyTransfusion = Ability:Add(325203, false, true) -- Necrolord (Unholy 
 UnholyTransfusion.buff_duration = 15
 UnholyTransfusion.tick_interval = 3
 UnholyTransfusion.hasted_ticks = true
+UnholyTransfusion:AutoAoe(false, 'apply')
 UnholyTransfusion:TrackAuras()
 -- Soulbind conduits
 local MindDevourer = Ability:Add(338332, true, true, 338333)
@@ -1536,12 +1545,12 @@ function Player:UpdateAbilities()
 		self.fiend = Shadowfiend
 	end
 	Shadowfiend.known = Shadowfiend.known and self.fiend == Shadowfiend
-	if VoidEruption.known then
-		Voidform.known = true
-		VoidBolt.known = true
-	end
-	LivingShadow.known = self.set_bonus.t28 >= 4
+	MindSear.damage.known = MindSear.known
+	Voidform.known = VoidEruption.known
+	VoidBolt.known = VoidEruption.known
 	ShadowflameRift.known = ShadowflamePrism.known
+	UnholyTransfusion.known = UnholyNova.known
+	LivingShadow.known = self.set_bonus.t28 >= 4
 
 	wipe(abilities.bySpellId)
 	wipe(abilities.velocity)
@@ -1766,6 +1775,12 @@ function VoidBolt:Usable(...)
 		return false
 	end
 	return Ability.Usable(self, ...)
+end
+
+function VoidBolt:CastLanded(...)
+	Ability.CastLanded(self, ...)
+	ShadowWordPain:RefreshAuraAll(3)
+	VampiricTouch:RefreshAuraAll(3)
 end
 
 function Voidform:Remains()
