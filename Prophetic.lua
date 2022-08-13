@@ -144,7 +144,6 @@ local Player = {
 	target_mode = 0,
 	gcd = 1.5,
 	gcd_remains = 0,
-	cast_remains = 0,
 	execute_remains = 0,
 	haste_factor = 1,
 	moving = false,
@@ -163,6 +162,18 @@ local Player = {
 		max = 100,
 		drain = 0,
 		generation = 0,
+	},
+	cast = {
+		start = 0,
+		ends = 0,
+		remains = 0,
+	},
+	channel = {
+		start = 0,
+		ends = 0,
+		remains = 0,
+		tick_interval = 0,
+		ticks = 0,
 	},
 	threat = {
 		status = 0,
@@ -717,11 +728,11 @@ function Ability:Duration()
 end
 
 function Ability:Casting()
-	return Player.ability_casting == self
+	return Player.cast.ability == self
 end
 
 function Ability:Channeling()
-	return Player.ability_channeling == self
+	return Player.channel.ability == self
 end
 
 function Ability:CastTime()
@@ -734,9 +745,9 @@ end
 
 function Ability:Previous(n)
 	local i = n or 1
-	if Player.ability_casting then
+	if Player.cast.ability then
 		if i == 1 then
-			return Player.ability_casting == self
+			return Player.cast.ability == self
 		end
 		i = i - 1
 	end
@@ -1105,6 +1116,7 @@ local Misery = Ability:Add(238558, false, true)
 local PsychicLink = Ability:Add(199484, false, true, 199486)
 local SearingNightmare = Ability:Add(341385, false, true)
 SearingNightmare.insanity_cost = 30
+SearingNightmare.cwc = true
 local ShadowCrash = Ability:Add(205385, false, true, 205386)
 ShadowCrash.cooldown_duration = 30
 ShadowCrash.insanity_gain = 15
@@ -1389,7 +1401,7 @@ function Player:TimeInCombat()
 	if self.combat_start > 0 then
 		return self.time - self.combat_start
 	end
-	if self.ability_casting and self.ability_casting.triggers_combat then
+	if self.cast.ability and self.cast.ability.triggers_combat then
 		return 0.1
 	end
 	return 0
@@ -1600,39 +1612,35 @@ function Player:UpdateThreat()
 end
 
 function Player:Update()
-	local _, start, duration, remains, spellId
 	self.main =  nil
 	self.cd = nil
 	self.interrupt = nil
 	self.extra = nil
 	self:UpdateTime()
-	start, duration = GetSpellCooldown(61304)
-	self.gcd_remains = start > 0 and duration - (self.ctime - start) or 0
-	_, _, _, _, remains, _, _, _, spellId = UnitCastingInfo('player')
-	self.ability_casting = abilities.bySpellId[spellId]
-	self.cast_remains = remains and (remains / 1000 - self.ctime) or 0
-	self.execute_remains = max(self.cast_remains, self.gcd_remains)
-	_, _, _, _, remains, _, _, spellId = UnitChannelInfo('player')
-	self.ability_channeling = abilities.bySpellId[spellId]
-	self.channel_remains = remains and (remains / 1000 - self.ctime) or 0
 	self.haste_factor = 1 / (1 + UnitSpellHaste('player') / 100)
 	self.gcd = 1.5 * self.haste_factor
+	local start, duration = GetSpellCooldown(61304)
+	self.gcd_remains = start > 0 and duration - (self.ctime - start) or 0
+	self.execute_remains = max(self.cast.ends - self.ctime, self.gcd_remains)
+	if self.channel.tick_interval > 0 then
+		self.channel.ticks = self.channel.tick_interval > 0 and floor((self.ctime - self.channel.start) / self.channel.tick_interval) or 0
+	end
 	self.health.current = UnitHealth('player')
 	self.health.max = UnitHealthMax('player')
 	self.mana.regen = GetPowerRegen()
 	self.mana.current = UnitPower('player', 0) + (self.mana.regen * self.execute_remains)
-	if self.ability_casting and self.ability_casting.mana_cost > 0 then
-		self.mana.current = self.mana.current - self.ability_casting:Cost()
+	if self.cast.ability and self.cast.ability.mana_cost > 0 then
+		self.mana.current = self.mana.current - self.cast.ability:Cost()
 	end
 	self.mana.current = min(self.mana.max, max(0, self.mana.current))
 	if Shadowform.known then
 		self.insanity.current = UnitPower('player', 13)
-		if self.ability_casting then
-			if self.ability_casting.insanity_cost > 0 then
-				self.insanity.current = self.insanity.current - self.ability_casting:InsanityCost()
+		if self.cast.ability then
+			if self.cast.ability.insanity_cost > 0 then
+				self.insanity.current = self.insanity.current - self.cast.ability:InsanityCost()
 			end
-			if self.ability_casting.insanity_gain > 0 then
-				self.insanity.current = self.insanity.current + self.ability_casting:InsanityGain()
+			if self.cast.ability.insanity_gain > 0 then
+				self.insanity.current = self.insanity.current + self.cast.ability:InsanityGain()
 			end
 		end
 		self.insanity.current = min(self.insanity.max, max(0, self.insanity.current))
@@ -1647,6 +1655,10 @@ function Player:Update()
 			ability:UpdateTargetsHit()
 		end
 		autoAoe:Purge()
+	end
+
+	if self.channel.interrupt_if then
+		self.channel.interruptible = self.channel.interrupt_if()
 	end
 end
 
@@ -2248,9 +2260,17 @@ actions.main+=/shadow_word_pain
 		UseCooldown(ShadowCrash)
 	end
 	if MindSear:Usable() and Player.enemies > self.mind_sear_cutoff and DarkThought:Up() then
+		Player.channel.interrupt_if = self.channel_interrupt[1]
+		if MindSear:Remains() > 1 then
+			return
+		end
 		return MindSear
 	end
 	if MindFlay:Usable() and DarkThought:Up() and self.dots_up and Voidform:Down() and not self.pool_for_cds and MindBlast:FullRechargeTime() >= Player.gcd then
+		Player.channel.interrupt_if = self.channel_interrupt[2]
+		if MindFlay:Remains() > 1 then
+			return
+		end
 		return MindFlay
 	end
 	if MindBlast:Usable() and self.dots_up and Player.enemies < (4 + (Misery.known and 2 or 0) + (PsychicLink.known and VampiricTouch:Ticking() or 0) + (ShadowflamePrism.known and Player.fiend:Up() and min(5, Player.enemies) or 0)) and (not ShadowflamePrism.known or self.vts_applied or not Player.fiend:Ready()) then
@@ -2273,9 +2293,17 @@ actions.main+=/shadow_word_pain
 	end
 	if not Player.moving then
 		if MindSear:Usable() and Player.enemies > self.mind_sear_cutoff then
+			Player.channel.interrupt_if = self.channel_interrupt[3]
+			if MindSear:Remains() > 1 then
+				return
+			end
 			return MindSear
 		end
 		if MindFlay:Usable() then
+			Player.channel.interrupt_if = self.channel_interrupt[4]
+			if MindFlay:Remains() > 1 then
+				return
+			end
 			return MindFlay
 		end
 	end
@@ -2286,6 +2314,21 @@ actions.main+=/shadow_word_pain
 		return ShadowWordPain
 	end
 end
+
+APL[SPEC.SHADOW].channel_interrupt = {
+	[1] = function() -- Mind Sear
+		return Player.channel.ticks >= 4
+	end,
+	[2] = function() -- Mind Flay
+		return Player.channel.ticks >= 4 and DarkThought:Down()
+	end,
+	[3] = function() -- Mind Sear
+		return Player.channel.ticks >= 2
+	end,
+	[4] = function() -- Mind Flay
+		return Player.channel.ticks >= 2 and (DarkThought:Down() or (not VoidBolt:Ready() and (Voidform:Up() or (DarkThought:Down() and DissonantEchoes:Up()))))
+	end,
+}
 
 APL.Interrupt = function(self)
 	if Silence:Usable() then
@@ -2529,7 +2572,7 @@ end
 
 function UI:UpdateDisplay()
 	timer.display = 0
-	local dim, dim_cd, text_center, text_cd
+	local dim, dim_cd, border, text_center, text_cd
 
 	if Opt.dimmer then
 		dim = not ((not Player.main) or
@@ -2552,13 +2595,14 @@ function UI:UpdateDisplay()
 		end
 	end
 	if Player.main and Player.main_freecast then
-		if not propheticPanel.freeCastOverlayOn then
-			propheticPanel.freeCastOverlayOn = true
-			propheticPanel.border:SetTexture(ADDON_PATH .. 'freecast.blp')
-		end
-	elseif propheticPanel.freeCastOverlayOn then
-		propheticPanel.freeCastOverlayOn = false
-		propheticPanel.border:SetTexture(ADDON_PATH .. 'border.blp')
+		border = 'freecast'
+	elseif Player.channel.ability and Player.channel.interrupt_if and not Player.channel.interruptible and not (Player.main and Player.main.cwc) then
+		border = 'misseffect'
+		dim = true
+	end
+	if border ~= propheticPanel.borderOverlay then
+		propheticPanel.borderOverlay = border
+		propheticPanel.border:SetTexture(ADDON_PATH .. (border or 'border') .. '.blp')
 	end
 
 	propheticPanel.dimmer:SetShown(dim)
@@ -2576,7 +2620,7 @@ function UI:UpdateCombat()
 	Player.main = APL[Player.spec]:Main()
 	if Player.main then
 		propheticPanel.icon:SetTexture(Player.main.icon)
-		Player.main_freecast = (Player.main.mana_cost > 0 and Player.main:Cost() == 0) or (Player.main.insanity_cost > 0 and Player.main:InsanityCost() == 0)
+		Player.main_freecast = (Player.main.mana_cost > 0 and Player.main:Cost() == 0) or (Shadowform.known and Player.main.insanity_cost > 0 and Player.main:InsanityCost() == 0) or (DarkThought.known and Player.channel.ability and Player.main == MindBlast and DarkThought:Up())
 	end
 	if Player.cd then
 		propheticCooldownPanel.icon:SetTexture(Player.cd.icon)
@@ -2775,44 +2819,56 @@ function events:PLAYER_TARGET_CHANGED()
 	end
 end
 
-function events:UNIT_FACTION(unitID)
-	if unitID == 'target' then
+function events:UNIT_FACTION(unitId)
+	if unitId == 'target' then
 		Target:Update()
 	end
 end
 
-function events:UNIT_FLAGS(unitID)
-	if unitID == 'target' then
+function events:UNIT_FLAGS(unitId)
+	if unitId == 'target' then
 		Target:Update()
 	end
 end
 
-function events:UNIT_SPELLCAST_START(unitID, castGUID, spellId)
-	if Opt.interrupt and unitID == 'target' then
+function events:UNIT_SPELLCAST_START(unitId, castGUID, spellId)
+	if Opt.interrupt and unitId == 'target' then
 		UI:UpdateCombatWithin(0.05)
+	end
+	if unitId ~= 'player' then
+		return
+	end
+	local _, _, _, start, ends = UnitCastingInfo(unitId)
+	Player.cast.ability = abilities.bySpellId[spellId]
+	if start and ends then
+		Player.cast.start = start / 1000
+		Player.cast.ends = ends / 1000
 	end
 end
+events.UNIT_SPELLCAST_DELAYED = events.UNIT_SPELLCAST_START
 
-function events:UNIT_SPELLCAST_STOP(unitID, castGUID, spellId)
-	if Opt.interrupt and unitID == 'target' then
+function events:UNIT_SPELLCAST_STOP(unitId, castGUID, spellId)
+	if Opt.interrupt and unitId == 'target' then
 		UI:UpdateCombatWithin(0.05)
 	end
+	if unitId ~= 'player' then
+		return
+	end
+	Player.cast.ability = nil
+	Player.cast.start = 0
+	Player.cast.ends = 0
 end
 events.UNIT_SPELLCAST_FAILED = events.UNIT_SPELLCAST_STOP
 events.UNIT_SPELLCAST_INTERRUPTED = events.UNIT_SPELLCAST_STOP
 
-function events:UNIT_SPELLCAST_SENT(unitId, destName, castGUID, spellId)
-	if unitID ~= 'player' or not spellId or castGUID:sub(6, 6) ~= '3' then
+function events:UNIT_SPELLCAST_SUCCEEDED(unitId, castGUID, spellId)
+	if unitId ~= 'player' then
 		return
 	end
-	local ability = abilities.bySpellId[spellId]
-	if not ability then
-		return
-	end
-end
-
-function events:UNIT_SPELLCAST_SUCCEEDED(unitID, castGUID, spellId)
-	if unitID ~= 'player' or not spellId or castGUID:sub(6, 6) ~= '3' then
+	Player.cast.ability = nil
+	Player.cast.start = 0
+	Player.cast.ends = 0
+	if not spellId or castGUID:sub(6, 6) ~= '3' then
 		return
 	end
 	local ability = abilities.bySpellId[spellId]
@@ -2821,6 +2877,46 @@ function events:UNIT_SPELLCAST_SUCCEEDED(unitID, castGUID, spellId)
 	end
 	if ability.traveling then
 		ability.next_castGUID = castGUID
+	end
+end
+
+function events:UNIT_SPELLCAST_CHANNEL_START(unitId, castGUID, spellId)
+	if unitId ~= 'player' then
+		return
+	end
+	local _, _, _, start, ends = UnitChannelInfo(unitId)
+	Player.channel.ability = abilities.bySpellId[spellId]
+	Player.channel.ticks = 0
+	if start and ends then
+		Player.channel.start = start / 1000
+		Player.channel.ends = ends / 1000
+		if Player.channel.ability then
+			Player.channel.tick_interval = (ends - start) / 1000 / (Player.channel.ability.buff_duration / Player.channel.ability.tick_interval)
+		else
+			Player.channel.tick_interval = 0
+		end
+	end
+end
+
+function events:UNIT_SPELLCAST_CHANNEL_STOP(unitId, castGUID, spellId)
+	if unitId ~= 'player' then
+		return
+	end
+	Player.channel.ability = nil
+	Player.channel.start = 0
+	Player.channel.ends = 0
+	Player.channel.tick_interval = 0
+	Player.channel.ticks = 0
+	Player.channel.interrupt_if = nil
+end
+
+function events:UNIT_SPELLCAST_CHANNEL_UPDATE(unitId, castGUID, spellId)
+	if unitId ~= 'player' then
+		return
+	end
+	local _, _, _, _, ends = UnitChannelInfo(unitId)
+	if ends then
+		Player.channel.ends = ends / 1000
 	end
 end
 
