@@ -1157,6 +1157,9 @@ UnholyTransfusion.hasted_ticks = true
 UnholyTransfusion:AutoAoe(false, 'apply')
 UnholyTransfusion:TrackAuras()
 -- Soulbind conduits
+local DissonantEchoes = Ability:Add(338342, true, true, 343144)
+DissonantEchoes.conduit_id = 115
+DissonantEchoes.buff_duration = 10
 local MindDevourer = Ability:Add(338332, true, true, 338333)
 MindDevourer.conduit_id = 113
 MindDevourer.buff_duration = 15
@@ -1785,7 +1788,7 @@ function Penance:Cooldown()
 end
 
 function VoidBolt:Usable(...)
-	if Voidform:Down() then
+	if Voidform:Down() and (not DissonantEchoes.known or DissonantEchoes:Down()) then
 		return false
 	end
 	return Ability.Usable(self, ...)
