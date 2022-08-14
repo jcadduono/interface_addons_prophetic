@@ -773,10 +773,16 @@ function Ability:AutoAoe(removeUnaffected, trigger)
 	end
 end
 
-function Ability:RecordTargetHit(guid)
-	self.auto_aoe.targets[guid] = Player.time
-	if not self.auto_aoe.start_time then
-		self.auto_aoe.start_time = self.auto_aoe.targets[guid]
+function Ability:RecordTargetHit(guid, event, missType)
+	if event == 'SPELL_MISSED' and (missType == 'EVADE' or missType == 'IMMUNE') then
+		autoAoe:Remove(guid)
+		return
+	end
+	if event == self.auto_aoe.trigger or (self.auto_aoe.trigger == 'SPELL_AURA_APPLIED' and event == 'SPELL_AURA_REFRESH') then
+		self.auto_aoe.targets[guid] = Player.time
+		if not self.auto_aoe.start_time then
+			self.auto_aoe.start_time = self.auto_aoe.targets[guid]
+		end
 	end
 end
 
@@ -1169,7 +1175,7 @@ local PainbreakerPsalm = Ability:Add(336165, false, true)
 PainbreakerPsalm.bonus_id = 6981
 local ShadowflamePrism = Ability:Add(336143, false, true)
 ShadowflamePrism.bonus_id = 6982
-local ShadowflameRift = Ability:Add(344748, false, true) -- triggered by Shadowflame Prism
+local ShadowflameRift = Ability:Add(344658, false, true, 344748) -- triggered by Shadowflame Prism
 ShadowflameRift:AutoAoe()
 local Unity = Ability:Add(364911, true, true)
 Unity.bonus_id = 8126
@@ -1852,7 +1858,19 @@ end
 
 -- Start Summoned Pet Modifications
 
-
+function Pet.Shadowfiend:CastLanded(unit, spellId, dstGUID, event, missType)
+	if event == 'SPELL_AURA_APPLIED' or event == 'SPELL_AURA_REFRESH' then
+		if ShadowflameRift:Match(spellId) then -- Shadowflame Rift 1.0s lifetime extension
+			unit.expires = unit.expires + 1
+		end
+		return
+	end
+	if Opt.auto_aoe and ShadowflameRift:Match(spellId) then -- Shadowflame Rift damage
+		ShadowflameRift:RecordTargetHit(dstGUID, event, missType)
+	end
+end
+Pet.Lightspawn.CastLanded = Pet.Shadowfiend.CastLanded
+Pet.Mindbender.CastLanded = Pet.Shadowfiend.CastLanded
 
 -- End Summoned Pet Modifications
 
@@ -2792,8 +2810,8 @@ CombatEvent.SPELL = function(event, srcGUID, dstGUID, spellId, spellName, spellS
 				pet:CastStart(unit, spellId, dstGUID)
 			elseif event == 'SPELL_CAST_FAILED' and pet.CastFailed then
 				pet:CastFailed(unit, spellId, dstGUID, missType)
-			elseif event == 'SPELL_DAMAGE' and pet.SpellDamage then
-				pet:SpellDamage(unit, spellId, dstGUID)
+			elseif (event == 'SPELL_DAMAGE' or event == 'SPELL_ABSORBED' or event == 'SPELL_MISSED' or event == 'SPELL_AURA_APPLIED' or event == 'SPELL_AURA_REFRESH') and pet.CastLanded then
+				pet:CastLanded(unit, spellId, dstGUID, event, missType)
 			end
 			--print(format('PET %d EVENT %s SPELL %s ID %d', pet.npcId, event, type(spellName) == 'string' and spellName or 'Unknown', spellId or 0))
 		end
@@ -2828,22 +2846,15 @@ CombatEvent.SPELL = function(event, srcGUID, dstGUID, spellId, spellName, spellS
 		elseif event == 'SPELL_AURA_REMOVED' then
 			ability:RemoveAura(dstGUID)
 		end
-		if ability == VirulentPlague and eventType == 'SPELL_PERIODIC_DAMAGE' and not ability.aura_targets[dstGUID] then
-			ability:ApplyAura(dstGUID) -- BUG: VP tick on unrecorded target, assume freshly applied (possibly by Raise Abomination?)
-		end
 	end
 	if dstGUID == Player.guid then
 		return -- ignore buffs beyond here
 	end
-	if Opt.auto_aoe then
-		if event == 'SPELL_MISSED' and (missType == 'EVADE' or missType == 'IMMUNE') then
-			autoAoe:Remove(dstGUID)
-		elseif ability.auto_aoe and (event == ability.auto_aoe.trigger or ability.auto_aoe.trigger == 'SPELL_AURA_APPLIED' and event == 'SPELL_AURA_REFRESH') then
-			ability:RecordTargetHit(dstGUID)
-		end
-	end
 	if event == 'SPELL_DAMAGE' or event == 'SPELL_ABSORBED' or event == 'SPELL_MISSED' or event == 'SPELL_AURA_APPLIED' or event == 'SPELL_AURA_REFRESH' then
 		ability:CastLanded(dstGUID, event, missType)
+		if Opt.auto_aoe and ability.auto_aoe then
+			ability:RecordTargetHit(dstGUID, event, missType)
+		end
 	end
 end
 
