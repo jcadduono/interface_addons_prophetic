@@ -2277,7 +2277,7 @@ actions.main+=/shadow_word_pain
 		end
 		return MindFlay
 	end
-	if MindBlast:Usable() and self.dots_up and Player.enemies < (4 + (Misery.known and 2 or 0) + (PsychicLink.known and VampiricTouch:Ticking() or 0) + (ShadowflamePrism.known and Player.fiend:Up() and min(5, Player.enemies) or 0)) and (not ShadowflamePrism.known or self.vts_applied or not Player.fiend:Ready()) then
+	if MindBlast:Usable() and self.dots_up and Target.timeToDie > MindBlast:CastTime() and Player.enemies < (4 + (Misery.known and 2 or 0) + (PsychicLink.known and VampiricTouch:Ticking() or 0) + (ShadowflamePrism.known and Player.fiend:Up() and min(5, Player.enemies) or 0)) and (not ShadowflamePrism.known or self.vts_applied or not Player.fiend:Ready()) then
 		return MindBlast
 	end
 	if VoidBolt:Usable() and self.dots_up then
