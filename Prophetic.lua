@@ -102,6 +102,7 @@ local function InitOpts()
 		cd_ttd = 8,
 		pot = false,
 		trinket = true,
+		fiend = true,
 		pws_threshold = 60,
 	})
 end
@@ -1993,6 +1994,11 @@ APL[SPEC.HOLY].Main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
+	if Player:HealthPct() < 30 and DesperatePrayer:Usable() then
+		UseExtra(DesperatePrayer)
+	elseif Player:HealthPct() < Opt.pws_threshold and PowerWordShield:Usable() then
+		UseExtra(PowerWordShield)
+	end
 end
 
 APL[SPEC.SHADOW].Main = function(self)
@@ -2046,6 +2052,11 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 		if PowerWordFortitude:Down() and PowerWordFortitude:Usable() then
 			UseExtra(PowerWordFortitude)
 		end
+	end
+	if Player:HealthPct() < 30 and DesperatePrayer:Usable() then
+		UseExtra(DesperatePrayer)
+	elseif Player:HealthPct() < Opt.pws_threshold and PowerWordShield:Usable() then
+		UseExtra(PowerWordShield)
 	end
 --[[
 actions=potion,if=buff.power_infusion.up&(buff.bloodlust.up|(time+fight_remains)>=320)
@@ -2576,7 +2587,8 @@ end
 
 function UI:UpdateDisplay()
 	timer.display = 0
-	local dim, dim_cd, border, text_center, text_cd
+	Player:UpdateTime()
+	local dim, dim_cd, border, text_center, text_cd, text_tr
 
 	if Opt.dimmer then
 		dim = not ((not Player.main) or
@@ -2608,9 +2620,32 @@ function UI:UpdateDisplay()
 		propheticPanel.borderOverlay = border
 		propheticPanel.border:SetTexture(ADDON_PATH .. (border or 'border') .. '.blp')
 	end
+	if Opt.fiend then
+		local remains
+		text_tr = ''
+		for _, unit in next, Pet.Shadowfiend.active_units do
+			remains = unit.expires - Player.time
+			if remains > 0 then
+				text_tr = format('%s%.1fs\n', text_tr, remains)
+			end
+		end
+		for _, unit in next, Pet.Lightspawn.active_units do
+			remains = unit.expires - Player.time
+			if remains > 0 then
+				text_tr = format('%s%.1fs\n', text_tr, remains)
+			end
+		end
+		for _, unit in next, Pet.Mindbender.active_units do
+			remains = unit.expires - Player.time
+			if remains > 0 then
+				text_tr = format('%s%.1fs\n', text_tr, remains)
+			end
+		end
+	end
 
 	propheticPanel.dimmer:SetShown(dim)
 	propheticPanel.text.center:SetText(text_center)
+	propheticPanel.text.tr:SetText(text_tr)
 	--propheticPanel.text.bl:SetText(format('%.1fs', Target.timeToDie))
 	propheticCooldownPanel.text:SetText(text_cd)
 	propheticCooldownPanel.dimmer:SetShown(dim_cd)
@@ -3314,6 +3349,12 @@ SlashCmdList[ADDON] = function(msg, editbox)
 		end
 		return Status('Show on-use trinkets in cooldown UI', Opt.trinket)
 	end
+	if startsWith(msg[1], 'fi') then
+		if msg[2] then
+			Opt.fiend = msg[2] == 'on'
+		end
+		return Status('Show Shadowfiend/Mindbender remaining time (top right)', Opt.fiend)
+	end
 	if msg[1] == 'pws' then
 		if msg[2] then
 			Opt.pws_threshold = max(min(tonumber(msg[2]) or 60, 100), 0)
@@ -3350,6 +3391,7 @@ SlashCmdList[ADDON] = function(msg, editbox)
 		'ttd |cFFFFD000[seconds]|r  - minimum enemy lifetime to use cooldowns on (default is 8 seconds, ignored on bosses)',
 		'pot |cFF00C000on|r/|cFFC00000off|r - show flasks and battle potions in cooldown UI',
 		'trinket |cFF00C000on|r/|cFFC00000off|r - show on-use trinkets in cooldown UI',
+		'fiend |cFF00C000on|r/|cFFC00000off|r - show Shadowfiend/Mindbender remaining time (top right)',
 		'pws |cFFFFD000[percent]|r - health percentage threshold to recommend Power Word: Shield',
 		'|cFFFFD000reset|r - reset the location of the ' .. ADDON .. ' UI to default',
 	} do
