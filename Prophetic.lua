@@ -1773,10 +1773,7 @@ end
 -- Start Ability Modifications
 
 function PowerWordShield:Usable()
-	if WeakenedSoul:Up() then
-		return false
-	end
-	return Ability.Usable(self)
+	return WeakenedSoul:Down() and Ability.Usable(self)
 end
 
 function Penance:Cooldown()
@@ -1788,10 +1785,7 @@ function Penance:Cooldown()
 end
 
 function VoidBolt:Usable(...)
-	if Voidform:Down() and (not DissonantEchoes.known or DissonantEchoes:Down()) then
-		return false
-	end
-	return Ability.Usable(self, ...)
+	return (Voidform:Up() or (DissonantEchoes.known and DissonantEchoes:Up())) and Ability.Usable(self, ...)
 end
 
 function VoidBolt:CastLanded(...)
@@ -1842,10 +1836,15 @@ function DevouringPlague:InsanityCost()
 end
 
 function SearingNightmare:Usable(...)
-	if not MindSear:Channeling() then
-		return false
-	end
-	return Ability.Usable(self, ...)
+	return MindSear:Channeling() and Ability.Usable(self, ...)
+end
+
+function MindBlast:CastWhileChanneling()
+	return (MindFlay:Channeling() or MindSear:Channeling()) and DarkThought:Up()
+end
+
+function MindBlast:FreeCast()
+	return DarkThought:Up()
 end
 
 -- End Ability Modifications
@@ -2172,7 +2171,7 @@ actions.cwc+=/searing_nightmare,use_while_casting=1,target_if=(variable.searing_
 actions.cwc+=/searing_nightmare,use_while_casting=1,target_if=talent.searing_nightmare.enabled&dot.shadow_word_pain.refreshable&spell_targets.mind_sear>2
 actions.cwc+=/mind_blast,only_cwc=1
 ]]
-	if MindBlast:Usable() and DarkThought:Up() and Pet.YourShadow:Remains() < Target.timeToDie and (
+	if MindBlast:Usable() and MindBlast:CastWhileChanneling() and Pet.YourShadow:Remains() < Target.timeToDie and (
 		(LivingShadow.known and ShadowflamePrism.known and Player.fiend:Up() and Voidform:Down()) or
 		(Pet.YourShadow:Remains() < (Player.gcd * (3 + (Voidform:Up() and 0 or 1) * 16)))
 	) then
@@ -2181,7 +2180,7 @@ actions.cwc+=/mind_blast,only_cwc=1
 	if SearingNightmare:Usable() and ((self.searing_nightmare_cutoff and not self.pool_for_cds) or (ShadowWordPain:Refreshable() and Player.enemies > 1)) then
 		return SearingNightmare
 	end
-	if MindBlast:Usable() then
+	if MindBlast:Usable() and MindBlast:CastWhileChanneling() then
 		return MindBlast
 	end
 end
@@ -2625,7 +2624,7 @@ function UI:UpdateCombat()
 	Player.main = APL[Player.spec]:Main()
 	if Player.main then
 		propheticPanel.icon:SetTexture(Player.main.icon)
-		Player.main_freecast = (Player.main.mana_cost > 0 and Player.main:Cost() == 0) or (Shadowform.known and Player.main.insanity_cost > 0 and Player.main:InsanityCost() == 0) or (DarkThought.known and Player.channel.ability and Player.main == MindBlast and DarkThought:Up())
+		Player.main_freecast = (Player.main.mana_cost > 0 and Player.main:Cost() == 0) or (Shadowform.known and Player.main.insanity_cost > 0 and Player.main:InsanityCost() == 0) or (Player.main.FreeCast and Player.main.FreeCast())
 	end
 	if Player.cd then
 		propheticCooldownPanel.icon:SetTexture(Player.cd.icon)
