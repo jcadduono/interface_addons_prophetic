@@ -2324,21 +2324,27 @@ actions.main+=/shadow_word_pain
 	) then
 		return ShadowWordPain
 	end
-	if not Player.moving then
-		if MindSear:Usable() and Player.enemies > self.mind_sear_cutoff then
-			Player.channel.interrupt_if = self.channel_interrupt[3]
-			if MindSear:Remains() > 1 then
-				return
-			end
-			return MindSear
+	if Player.moving then
+		if ShadowWordDeath:Usable() then
+			UseCooldown(ShadowWordDeath)
 		end
-		if MindFlay:Usable() then
-			Player.channel.interrupt_if = self.channel_interrupt[4]
-			if MindFlay:Remains() > 1 then
-				return
-			end
-			return MindFlay
+		if ShadowWordPain:Usable() then
+			UseCooldown(ShadowWordPain)
 		end
+	end
+	if MindSear:Usable() and Player.enemies > self.mind_sear_cutoff then
+		Player.channel.interrupt_if = self.channel_interrupt[3]
+		if MindSear:Remains() > 1 then
+			return
+		end
+		return MindSear
+	end
+	if MindFlay:Usable() then
+		Player.channel.interrupt_if = self.channel_interrupt[4]
+		if MindFlay:Remains() > 1 then
+			return
+		end
+		return MindFlay
 	end
 	if ShadowWordDeath:Usable() then
 		return ShadowWordDeath
