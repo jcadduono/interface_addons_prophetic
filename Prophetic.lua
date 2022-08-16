@@ -1375,6 +1375,7 @@ SpectralFlaskOfPower.buff = Ability:Add(307185, true, true)
 -- Equipment
 local Trinket1 = InventoryItem:Add(0)
 local Trinket2 = InventoryItem:Add(0)
+Trinket.FleshrendersMeathook = InventoryItem:Add(110002)
 Trinket.SoleahsSecretTechnique = InventoryItem:Add(190958)
 Trinket.SoleahsSecretTechnique.buff = Ability:Add(368512, true, true)
 -- End Inventory Items
@@ -1969,6 +1970,8 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		UseCooldown(Trinket1)
 	elseif Trinket2:Usable() then
 		UseCooldown(Trinket2)
+	elseif FleshrendersMeathook:Usable() and PowerInfusion:Up() then
+		UseCooldown(FleshrendersMeathook)
 	end
 	if Player.moving and Player.swp:Usable() and Player.swp:Refreshable() then
 		return Player.swp
@@ -2190,6 +2193,9 @@ actions.trinkets+=/use_items,if=buff.voidform.up|buff.power_infusion.up|cooldown
 	end
 	if Trinket2:Usable() and (Voidform:Up() or PowerInfusion:Up() or not VoidEruption:Ready(10)) then
 		return UseCooldown(Trinket2)
+	end
+	if Trinket.FleshrendersMeathook:Usable() and (PowerInfusion:Up() or (Voidform:Remains() > 10 and not PowerInfusion:Ready(30))) then
+		return UseCooldown(Trinket.FleshrendersMeathook)
 	end
 end
 
