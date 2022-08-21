@@ -240,23 +240,23 @@ propheticPanel.swipe:SetDrawEdge(false)
 propheticPanel.text = CreateFrame('Frame', nil, propheticPanel)
 propheticPanel.text:SetAllPoints(propheticPanel)
 propheticPanel.text.tl = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.tl:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+propheticPanel.text.tl:SetFont('Fonts\\FRIZQT__.TTF', 11.5, 'OUTLINE')
 propheticPanel.text.tl:SetPoint('TOPLEFT', propheticPanel, 'TOPLEFT', 2.5, -3)
 propheticPanel.text.tl:SetJustifyH('LEFT')
 propheticPanel.text.tr = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.tr:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+propheticPanel.text.tr:SetFont('Fonts\\FRIZQT__.TTF', 11.5, 'OUTLINE')
 propheticPanel.text.tr:SetPoint('TOPRIGHT', propheticPanel, 'TOPRIGHT', -2.5, -3)
 propheticPanel.text.tr:SetJustifyH('RIGHT')
 propheticPanel.text.bl = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.bl:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+propheticPanel.text.bl:SetFont('Fonts\\FRIZQT__.TTF', 11.5, 'OUTLINE')
 propheticPanel.text.bl:SetPoint('BOTTOMLEFT', propheticPanel, 'BOTTOMLEFT', 2.5, 3)
 propheticPanel.text.bl:SetJustifyH('LEFT')
 propheticPanel.text.br = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.br:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
+propheticPanel.text.br:SetFont('Fonts\\FRIZQT__.TTF', 11.5, 'OUTLINE')
 propheticPanel.text.br:SetPoint('BOTTOMRIGHT', propheticPanel, 'BOTTOMRIGHT', -2.5, 3)
 propheticPanel.text.br:SetJustifyH('RIGHT')
 propheticPanel.text.center = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.center:SetFont('Fonts\\FRIZQT__.TTF', 9, 'OUTLINE')
+propheticPanel.text.center:SetFont('Fonts\\FRIZQT__.TTF', 11.5, 'OUTLINE')
 propheticPanel.text.center:SetAllPoints(propheticPanel.text)
 propheticPanel.text.center:SetJustifyH('CENTER')
 propheticPanel.text.center:SetJustifyV('CENTER')
@@ -1143,7 +1143,7 @@ VoidTorrent.cooldown_duration = 30
 local DarkThought = Ability:Add(341205, true, true, 341207)
 DarkThought.buff_duration = 10
 ------ Tier Bonuses
-local LivingShadow = Ability:Add(363469, false, true) -- T28 4 piece
+local LivingShadow = Ability:Add(363469, true, true, 363578) -- T28 4 piece
 -- Covenant abilities
 local FirstStrike = Ability:Add(325069, true, true, 325381) -- Night Fae (Korayn Soulbind)
 local Fleshcraft = Ability:Add(324631, true, true, 324867) -- Necrolord
@@ -1293,7 +1293,6 @@ Pet.Lightspawn = SummonedPet:Add(128140, 15, Lightspawn)
 Pet.RattlingMage = SummonedPet:Add(180113, 20, UnholyNova)
 Pet.Shadowfiend = SummonedPet:Add(19668, 15, Shadowfiend)
 Pet.Mindbender = SummonedPet:Add(62982)
-Pet.YourShadow = SummonedPet:Add(183955, 6, LivingShadow)
 
 -- End Summoned Pets
 
@@ -2206,9 +2205,9 @@ actions.cwc+=/searing_nightmare,use_while_casting=1,target_if=(variable.searing_
 actions.cwc+=/searing_nightmare,use_while_casting=1,target_if=talent.searing_nightmare.enabled&dot.shadow_word_pain.refreshable&spell_targets.mind_sear>2
 actions.cwc+=/mind_blast,only_cwc=1
 ]]
-	if MindBlast:Usable() and MindBlast:CastWhileChanneling() and Pet.YourShadow:Remains() < Target.timeToDie and (
+	if MindBlast:Usable() and MindBlast:CastWhileChanneling() and LivingShadow:Remains() < Target.timeToDie and (
 		(LivingShadow.known and ShadowflamePrism.known and Player.fiend:Up() and Voidform:Down()) or
-		(Pet.YourShadow:Remains() < (Player.gcd * (3 + (Voidform:Up() and 0 or 1) * 16)))
+		(LivingShadow:Remains() < (Player.gcd * (3 + (Voidform:Up() and 0 or 1) * 16)))
 	) then
 		return MindBlast
 	end
@@ -2618,7 +2617,7 @@ end
 function UI:UpdateDisplay()
 	timer.display = 0
 	Player:UpdateTime()
-	local dim, dim_cd, border, text_center, text_cd, text_tr
+	local dim, dim_cd, border, text_center, text_cd, text_tl, text_tr
 
 	if Opt.dimmer then
 		dim = not ((not Player.main) or
@@ -2671,10 +2670,17 @@ function UI:UpdateDisplay()
 				text_tr = format('%s%.1fs\n', text_tr, remains)
 			end
 		end
+		if LivingShadow.known then
+			remains = LivingShadow:Remains()
+			if remains > 0 then
+				text_tl = format('%.1fs', remains)
+			end
+		end
 	end
 
 	propheticPanel.dimmer:SetShown(dim)
 	propheticPanel.text.center:SetText(text_center)
+	propheticPanel.text.tl:SetText(text_tl)
 	propheticPanel.text.tr:SetText(text_tr)
 	--propheticPanel.text.bl:SetText(format('%.1fs', Target.timeToDie))
 	propheticCooldownPanel.text:SetText(text_cd)
