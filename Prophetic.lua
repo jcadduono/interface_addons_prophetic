@@ -1163,6 +1163,9 @@ UnholyTransfusion.tick_interval = 3
 UnholyTransfusion.hasted_ticks = true
 UnholyTransfusion:AutoAoe(false, 'apply')
 UnholyTransfusion:TrackAuras()
+local VolatileSolvent = Ability:Add(323074, true, true) -- Necrolord (Plague Deviser Marileth Soulbind)
+VolatileSolvent.Humanoid = Ability:Add(323491, true, true)
+VolatileSolvent.Humanoid.buff_duration = 120
 -- Soulbind conduits
 local DissonantEchoes = Ability:Add(338342, true, true, 343144)
 DissonantEchoes.conduit_id = 115
@@ -1575,6 +1578,9 @@ function Player:UpdateAbilities()
 	ShadowflameRift.known = ShadowflamePrism.known
 	UnholyTransfusion.known = UnholyNova.known
 	LivingShadow.known = self.set_bonus.t28 >= 4
+	if VolatileSolvent.known then
+		VolatileSolvent.Humanoid.known = true
+	end
 
 	wipe(abilities.bySpellId)
 	wipe(abilities.velocity)
@@ -1905,9 +1911,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		if SummonSteward:Usable() and PhialOfSerenity:Charges() < 1 then
 			UseExtra(SummonSteward)
 		end
-		if Fleshcraft:Usable() and Fleshcraft:Remains() < 10 then
-			UseExtra(Fleshcraft)
-		end
 		if not Player:InArenaOrBattleground() then
 			if EternalAugmentRune:Usable() and EternalAugmentRune.buff:Remains() < 300 then
 				UseCooldown(EternalAugmentRune)
@@ -1922,8 +1925,12 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
 		end
-		if Shadowform:Usable() and Shadowform:Down() then
-			return Shadowform
+		if Fleshcraft:Usable() then
+			if PustuleEruption.known or VolatileSolvent.known then
+				UseCooldown(Fleshcraft)
+			elseif Fleshcraft:Remains() < 10 then
+				UseExtra(Fleshcraft)
+			end
 		end
 		if VampiricTouch:Usable() and VampiricTouch:Down() then
 			return VampiricTouch
@@ -1992,9 +1999,6 @@ APL[SPEC.HOLY].Main = function(self)
 		if SummonSteward:Usable() and PhialOfSerenity:Charges() < 1 then
 			UseExtra(SummonSteward)
 		end
-		if Fleshcraft:Usable() and Fleshcraft:Remains() < 10 then
-			UseExtra(Fleshcraft)
-		end
 		if not Player:InArenaOrBattleground() then
 			if EternalAugmentRune:Usable() and EternalAugmentRune.buff:Remains() < 300 then
 				UseCooldown(EternalAugmentRune)
@@ -2008,6 +2012,13 @@ APL[SPEC.HOLY].Main = function(self)
 		end
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
+		end
+		if Fleshcraft:Usable() then
+			if PustuleEruption.known or VolatileSolvent.known then
+				UseCooldown(Fleshcraft)
+			elseif Fleshcraft:Remains() < 10 then
+				UseExtra(Fleshcraft)
+			end
 		end
 	else
 		if PowerWordFortitude:Down() and PowerWordFortitude:Usable() then
@@ -2042,9 +2053,6 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 		if SummonSteward:Usable() and PhialOfSerenity:Charges() < 1 then
 			UseExtra(SummonSteward)
 		end
-		if Fleshcraft:Usable() and Fleshcraft:Remains() < 10 then
-			UseExtra(Fleshcraft)
-		end
 		if not Player:InArenaOrBattleground() then
 			if EternalAugmentRune:Usable() and EternalAugmentRune.buff:Remains() < 300 then
 				UseCooldown(EternalAugmentRune)
@@ -2061,6 +2069,13 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 		end
 		if Shadowform:Usable() and Shadowform:Down() then
 			return Shadowform
+		end
+		if Fleshcraft:Usable() then
+			if PustuleEruption.known or VolatileSolvent.known then
+				UseCooldown(Fleshcraft)
+			elseif Fleshcraft:Remains() < 10 then
+				UseExtra(Fleshcraft)
+			end
 		end
 		if VampiricTouch:Usable() and VampiricTouch:Down() and not Damnation.known then
 			return VampiricTouch
@@ -2155,13 +2170,21 @@ actions.cds+=/call_action_list,name=trinkets
 actions.cds+=/mindbender,if=(talent.searing_nightmare.enabled&spell_targets.mind_sear>variable.mind_sear_cutoff|dot.shadow_word_pain.ticking)&variable.vts_applied
 actions.cds+=/desperate_prayer,if=health.pct<=75
 ]]
-	if PowerInfusion:Usable() and Voidform:Up() and ((not self.five_minutes_viable or not between(Player:TimeInCombat(), 235, 300)) or Target.timeToDie <= 25) then
+	if PowerInfusion:Usable() and ((Voidform:Up() and (not self.five_minutes_viable or not between(Player:TimeInCombat(), 235, 300))) or (Target.boss and Target.timeToDie <= 25)) then
 		return UseCooldown(PowerInfusion)
+	end
+	if VolatileSolvent.known then
+		if Fleshcraft:Channeling() then
+			Player.channel.interrupt_if = self.channel_interrupt[5]
+		end
+		if Fleshcraft:Usable() and VolatileSolvent.Humanoid:Remains() <= (3 * Player.gcd) then
+			return UseCooldown(Fleshcraft)
+		end
 	end
 	if UnholyNova:Usable() and ((not HungeringVoid.known and self.dots_up) or (HungeringVoid.known and HungeringVoid:Up() and Voidform:Up()) or (Voidform:Down() and (not VoidEruption:Ready(15) or not self.cd_management))) then
 		return UseCooldown(UnholyNova)
 	end
-	if VoidEruption:Usable() and self.cd_management and (Player.insanity.current <= 85 or (SearingNightmare.known and self.searing_nightmare_cutoff)) and not Player.fiend:Ready() and ((Player.fiend:Up() and not ShadowWordDeath:Ready()) or not Player.fiend:Ready(Player.gcd * 5) or not ShadowflamePrism.known) and (MindBlast:Charges() == 0 or Player:TimeInCombat() >= 15) then
+	if VoidEruption:Usable() and self.cd_management and (not VolatileSolvent.known or VolatileSolvent.Humanoid:Up()) and (Player.insanity.current <= 85 or (SearingNightmare.known and self.searing_nightmare_cutoff)) and not Player.fiend:Ready() and ((Player.fiend:Up() and not ShadowWordDeath:Ready()) or not Player.fiend:Ready(Player.gcd * 5) or not ShadowflamePrism.known) and (MindBlast:Charges() == 0 or Player:TimeInCombat() >= 15) then
 		return UseCooldown(VoidEruption)
 	end
 	if MindbenderShadow:Usable() and self.vts_applied and ((SearingNightmare.known and Player.enemies > self.mind_sear_cutoff) or ShadowWordPain:Up()) then
@@ -2371,6 +2394,9 @@ APL[SPEC.SHADOW].channel_interrupt = {
 	end,
 	[4] = function() -- Mind Flay
 		return Player.channel.ticks >= 2 and (DarkThought:Down() or (not VoidBolt:Ready() and (Voidform:Up() or (DarkThought:Down() and DissonantEchoes:Up()))))
+	end,
+	[5] = function() -- Fleshcraft (Volatile Solvent: Humanoid)
+		return VolatileSolvent.Humanoid:Remains() > 100
 	end,
 }
 
