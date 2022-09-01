@@ -1397,19 +1397,19 @@ function Player:HealthPct()
 end
 
 function Player:ManaDeficit()
-	return self.mana_max - self.mana
+	return self.mana.max - self.mana.current
 end
 
 function Player:ManaPct()
-	return self.mana / self.mana_max * 100
+	return self.mana.current / self.mana.max * 100
 end
 
 function Player:ManaTimeToMax()
-	local deficit = self.mana_max - self.mana
+	local deficit = self.mana.max - self.mana.current
 	if deficit <= 0 then
 		return 0
 	end
-	return deficit / self.mana_regen
+	return deficit / self.mana.regen
 end
 
 function Player:TimeInCombat()
