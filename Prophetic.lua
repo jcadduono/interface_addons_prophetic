@@ -1145,6 +1145,14 @@ DarkThought.buff_duration = 10
 ------ Tier Bonuses
 local LivingShadow = Ability:Add(363469, true, true, 363578) -- T28 4 piece
 -- Covenant abilities
+local AscendedBlast = Ability:Add(325283, false, true) -- Kyrian (Boon of the Ascended)
+AscendedBlast.cooldown_duration = 3
+local AscendedNova = Ability:Add(325041, false, true) -- Kyrian (Boon of the Ascended)
+AscendedNova.cooldown_duration = 3
+AscendedNova:AutoAoe()
+local BoonOfTheAscended = Ability:Add(325013, true, true) -- Kyrian
+BoonOfTheAscended.buff_duration = 10
+BoonOfTheAscended.cooldown_duration = 180
 local FirstStrike = Ability:Add(325069, true, true, 325381) -- Night Fae (Korayn Soulbind)
 local Fleshcraft = Ability:Add(324631, true, true, 324867) -- Necrolord
 Fleshcraft.buff_duration = 120
@@ -1576,6 +1584,8 @@ function Player:UpdateAbilities()
 	Voidform.known = VoidEruption.known
 	VoidBolt.known = VoidEruption.known
 	ShadowflameRift.known = ShadowflamePrism.known
+	AscendedBlast.known = BoonOfTheAscended.known
+	AscendedNova.known = BoonOfTheAscended.known
 	UnholyTransfusion.known = UnholyNova.known
 	LivingShadow.known = self.set_bonus.t28 >= 4
 	if VolatileSolvent.known then
@@ -1715,7 +1725,7 @@ function Target:UpdateHealth(reset)
 		table.remove(self.health.history, 1)
 		self.health.history[25] = self.health.current
 	end
-	self.timeToDieMax = self.health.current / Player.health.max * 10
+	self.timeToDieMax = self.health.current / Player.health.max * (Player.spec == SPEC.SHADOW and 10 or 20)
 	self.health.pct = self.health.max > 0 and (self.health.current / self.health.max * 100) or 100
 	self.health.loss_per_sec = (self.health.history[1] - self.health.current) / 5
 	self.timeToDie = self.health.loss_per_sec > 0 and min(self.timeToDieMax, self.health.current / self.health.loss_per_sec) or self.timeToDieMax
@@ -1860,6 +1870,14 @@ function MindBlast:FreeCast()
 	return DarkThought:Up()
 end
 
+function AscendedBlast:Usable()
+	if BoonOfTheAscended:Down() then
+		return false
+	end
+	return Ability.Usable(self)
+end
+AscendedNova.Usable = AscendedBlast.Usable
+
 -- End Ability Modifications
 
 -- Start Summoned Pet Modifications
@@ -1945,10 +1963,17 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	elseif (Player:HealthPct() < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	end
+	if Trinket1:Usable() then
+		UseCooldown(Trinket1)
+	elseif Trinket2:Usable() then
+		UseCooldown(Trinket2)
+	elseif Trinket.FleshrendersMeathook:Usable() and PowerInfusion:Up() then
+		UseCooldown(Trinket.FleshrendersMeathook)
+	end
 	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
-	if Player.swp:Usable() and Player.swp:Down() and Target.timeToDie > 4 then
+	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > 4 or (PurgeTheWicked.known and Player.enemies > 1 and Penance:Ready(Target.timeToDie))) then
 		return Player.swp
 	end
 	if Schism.known and Player.fiend:Usable() and Schism:Ready(3) and Target.timeToDie > 15 then
@@ -1963,32 +1988,54 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if PowerWordSolace:Usable(0.2) then
 		return PowerWordSolace
 	end
-	if Player.swp:Usable() and ((Player.swp:Refreshable() and Schism:Down()) or (Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10)) and Target.timeToDie > Player.swp:Remains() + 4 then
+	if Player.swp:Usable() and ((Schism.known and Schism:Ready(2)) or (BoonOfTheAscended.known and BoonOfTheAscended:Ready(2))) and Player.swp:Remains() < 10 and Target.timeToDie > Player.swp:Remains() + 4 then
 		return Player.swp
 	end
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
 	end
-	if Player.fiend:Usable() and Target.timeToDie > 15 then
-		UseCooldown(Player.fiend)
+	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
+		return Schism
 	end
-	if Trinket1:Usable() then
-		UseCooldown(Trinket1)
-	elseif Trinket2:Usable() then
-		UseCooldown(Trinket2)
-	elseif FleshrendersMeathook:Usable() and PowerInfusion:Up() then
-		UseCooldown(FleshrendersMeathook)
+	if UnholyNova:Usable() then
+		UseCooldown(UnholyNova)
+	end
+	if BoonOfTheAscended.known then
+		if BoonOfTheAscended:Usable() and (Target.timeToDie > 10 or Player.enemies > 1) and (not Schism.known or not Schism:Ready(10)) then
+			UseCooldown(BoonOfTheAscended)
+		end
+		if BoonOfTheAscended:Up() then
+			local apl = self:boon()
+			if apl then return apl end
+		end
+	end
+	if Player.fiend:Usable() and (Target.timeToDie > 15 or Player.enemies > 1) then
+		UseCooldown(Player.fiend)
 	end
 	if Player.moving and Player.swp:Usable() and Player.swp:Refreshable() then
 		return Player.swp
 	end
-	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
-		return Schism
+	if MindBlast:Usable() then
+		return MindBlast
 	end
-	if HolyNova:Usable() and (SuddenRevelation:Up() or (Player.enemies >= 4 and Schism:Down())) then
+	if HolyNova:Usable() and Player.enemies >= 3 and Schism:Down() then
 		UseCooldown(HolyNova)
 	end
-	return Smite
+	if Smite:Usable() then
+		return Smite
+	end
+	if Player.swp:Usable() then
+		return Player.swp
+	end
+end
+
+APL[SPEC.DISCIPLINE].boon = function(self)
+	if AscendedBlast:Usable() then
+		return AscendedBlast
+	end
+	if AscendedNova:Usable() then
+		return AscendedNova
+	end
 end
 
 APL[SPEC.HOLY].Main = function(self)
