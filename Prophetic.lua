@@ -1958,26 +1958,40 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
+	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend:Up() or (BoonOfTheAscended.known and BoonOfTheAscended:Up())
 	if Player:HealthPct() < 30 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
 	elseif (Player:HealthPct() < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	end
-	if Trinket1:Usable() then
-		UseCooldown(Trinket1)
-	elseif Trinket2:Usable() then
-		UseCooldown(Trinket2)
-	elseif Trinket.FleshrendersMeathook:Usable() and PowerInfusion:Up() then
-		UseCooldown(Trinket.FleshrendersMeathook)
+	if Player.use_cds and (not PowerInfusion:Ready() or PowerInfusion:Up()) then
+		if Trinket1:Usable() then
+			UseCooldown(Trinket1)
+		elseif Trinket2:Usable() then
+			UseCooldown(Trinket2)
+		elseif Trinket.FleshrendersMeathook:Usable() then
+			UseCooldown(Trinket.FleshrendersMeathook)
+		end
 	end
 	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
-	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > 4 or (PurgeTheWicked.known and Player.enemies > 1 and Penance:Ready(Target.timeToDie))) then
+	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > 4 or (PurgeTheWicked.known and Penance:Ready(Target.timeToDie))) then
 		return Player.swp
+	end
+	if Player.use_cds and PowerInfusion:Usable() then
+		UseCooldown(PowerInfusion)
 	end
 	if Schism.known and Player.fiend:Usable() and Schism:Ready(3) and Target.timeToDie > 15 then
 		UseCooldown(Player.fiend)
+	end
+	if BoonOfTheAscended.known then
+		if AscendedBlast:Usable(0.2) then
+			return AscendedBlast
+		end
+		if AscendedNova:Usable() and Player.enemies >= 3 then
+			return AscendedNova
+		end
 	end
 	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
 		return Schism
@@ -1997,16 +2011,15 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
 	end
-	if UnholyNova:Usable() then
+	if Player.use_cds and UnholyNova:Usable() then
 		UseCooldown(UnholyNova)
 	end
 	if BoonOfTheAscended.known then
-		if BoonOfTheAscended:Usable() and (Target.timeToDie > 10 or Player.enemies > 1) and (not Schism.known or not Schism:Ready(10)) then
+		if Player.use_cds and BoonOfTheAscended:Usable() and (Target.timeToDie > 10 or Player.enemies > 1) and (not Schism.known or not Schism:Ready(10)) then
 			UseCooldown(BoonOfTheAscended)
 		end
-		if BoonOfTheAscended:Up() then
-			local apl = self:boon()
-			if apl then return apl end
+		if AscendedNova:Usable() then
+			return AscendedNova
 		end
 	end
 	if Player.fiend:Usable() and (Target.timeToDie > 15 or Player.enemies > 1) then
@@ -2026,15 +2039,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	end
 	if Player.swp:Usable() then
 		return Player.swp
-	end
-end
-
-APL[SPEC.DISCIPLINE].boon = function(self)
-	if AscendedBlast:Usable() then
-		return AscendedBlast
-	end
-	if AscendedNova:Usable() then
-		return AscendedNova
 	end
 end
 
