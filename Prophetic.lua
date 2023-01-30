@@ -151,11 +151,13 @@ local Player = {
 	health = {
 		current = 0,
 		max = 100,
+		pct = 0,
 	},
 	mana = {
 		current = 0,
 		base = 100,
 		max = 100,
+		pct = 0,
 		regen = 0,
 	},
 	insanity = {
@@ -214,6 +216,8 @@ local BaseMana = {
 	433,  469,  509,  551,  598,  648,  702,  761,  825,  894,   -- 40
 	969,  1050, 1138, 1234, 1337, 1449, 1571, 1702, 1845, 2000,  -- 50
 	2349, 2759, 3241, 3807, 4472, 5253, 6170, 7247, 8513, 10000, -- 60
+	11746, 13797, 16206, 19036, 22360, -- 65
+	26265, 30851, 36238, 42566, 50000, -- 70
 }
 
 local propheticPanel = CreateFrame('Frame', 'propheticPanel', UIParent)
@@ -221,6 +225,10 @@ propheticPanel:SetPoint('CENTER', 0, -169)
 propheticPanel:SetFrameStrata('BACKGROUND')
 propheticPanel:SetSize(64, 64)
 propheticPanel:SetMovable(true)
+propheticPanel:SetUserPlaced(true)
+propheticPanel:RegisterForDrag('LeftButton')
+propheticPanel:SetScript('OnDragStart', propheticPanel.StartMoving)
+propheticPanel:SetScript('OnDragStop', propheticPanel.StopMovingOrSizing)
 propheticPanel:Hide()
 propheticPanel.icon = propheticPanel:CreateTexture(nil, 'BACKGROUND')
 propheticPanel.icon:SetAllPoints(propheticPanel)
@@ -266,11 +274,12 @@ propheticPanel.button:RegisterForClicks('LeftButtonDown', 'RightButtonDown', 'Mi
 local propheticPreviousPanel = CreateFrame('Frame', 'propheticPreviousPanel', UIParent)
 propheticPreviousPanel:SetFrameStrata('BACKGROUND')
 propheticPreviousPanel:SetSize(64, 64)
-propheticPreviousPanel:Hide()
+propheticPreviousPanel:SetMovable(true)
+propheticPreviousPanel:SetUserPlaced(true)
 propheticPreviousPanel:RegisterForDrag('LeftButton')
 propheticPreviousPanel:SetScript('OnDragStart', propheticPreviousPanel.StartMoving)
 propheticPreviousPanel:SetScript('OnDragStop', propheticPreviousPanel.StopMovingOrSizing)
-propheticPreviousPanel:SetMovable(true)
+propheticPreviousPanel:Hide()
 propheticPreviousPanel.icon = propheticPreviousPanel:CreateTexture(nil, 'BACKGROUND')
 propheticPreviousPanel.icon:SetAllPoints(propheticPreviousPanel)
 propheticPreviousPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
@@ -278,13 +287,14 @@ propheticPreviousPanel.border = propheticPreviousPanel:CreateTexture(nil, 'ARTWO
 propheticPreviousPanel.border:SetAllPoints(propheticPreviousPanel)
 propheticPreviousPanel.border:SetTexture(ADDON_PATH .. 'border.blp')
 local propheticCooldownPanel = CreateFrame('Frame', 'propheticCooldownPanel', UIParent)
-propheticCooldownPanel:SetSize(64, 64)
 propheticCooldownPanel:SetFrameStrata('BACKGROUND')
-propheticCooldownPanel:Hide()
+propheticCooldownPanel:SetSize(64, 64)
+propheticCooldownPanel:SetMovable(true)
+propheticCooldownPanel:SetUserPlaced(true)
 propheticCooldownPanel:RegisterForDrag('LeftButton')
 propheticCooldownPanel:SetScript('OnDragStart', propheticCooldownPanel.StartMoving)
 propheticCooldownPanel:SetScript('OnDragStop', propheticCooldownPanel.StopMovingOrSizing)
-propheticCooldownPanel:SetMovable(true)
+propheticCooldownPanel:Hide()
 propheticCooldownPanel.icon = propheticCooldownPanel:CreateTexture(nil, 'BACKGROUND')
 propheticCooldownPanel.icon:SetAllPoints(propheticCooldownPanel)
 propheticCooldownPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
@@ -307,11 +317,12 @@ propheticCooldownPanel.text:SetJustifyV('CENTER')
 local propheticInterruptPanel = CreateFrame('Frame', 'propheticInterruptPanel', UIParent)
 propheticInterruptPanel:SetFrameStrata('BACKGROUND')
 propheticInterruptPanel:SetSize(64, 64)
-propheticInterruptPanel:Hide()
+propheticInterruptPanel:SetMovable(true)
+propheticInterruptPanel:SetUserPlaced(true)
 propheticInterruptPanel:RegisterForDrag('LeftButton')
 propheticInterruptPanel:SetScript('OnDragStart', propheticInterruptPanel.StartMoving)
 propheticInterruptPanel:SetScript('OnDragStop', propheticInterruptPanel.StopMovingOrSizing)
-propheticInterruptPanel:SetMovable(true)
+propheticInterruptPanel:Hide()
 propheticInterruptPanel.icon = propheticInterruptPanel:CreateTexture(nil, 'BACKGROUND')
 propheticInterruptPanel.icon:SetAllPoints(propheticInterruptPanel)
 propheticInterruptPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
@@ -325,11 +336,12 @@ propheticInterruptPanel.swipe:SetDrawEdge(false)
 local propheticExtraPanel = CreateFrame('Frame', 'propheticExtraPanel', UIParent)
 propheticExtraPanel:SetFrameStrata('BACKGROUND')
 propheticExtraPanel:SetSize(64, 64)
-propheticExtraPanel:Hide()
+propheticExtraPanel:SetMovable(true)
+propheticExtraPanel:SetUserPlaced(true)
 propheticExtraPanel:RegisterForDrag('LeftButton')
 propheticExtraPanel:SetScript('OnDragStart', propheticExtraPanel.StartMoving)
 propheticExtraPanel:SetScript('OnDragStop', propheticExtraPanel.StopMovingOrSizing)
-propheticExtraPanel:SetMovable(true)
+propheticExtraPanel:Hide()
 propheticExtraPanel.icon = propheticExtraPanel:CreateTexture(nil, 'BACKGROUND')
 propheticExtraPanel.icon:SetAllPoints(propheticExtraPanel)
 propheticExtraPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
@@ -413,8 +425,8 @@ function autoAoe:Add(guid, update)
 	if self.blacklist[guid] then
 		return
 	end
-	local npcId = guid:match('^%a+%-0%-%d+%-%d+%-%d+%-(%d+)')
-	if not npcId or self.ignored_units[tonumber(npcId)] then
+	local unitId = guid:match('^%w+-%d+-%d+-%d+-%d+-(%d+)')
+	if unitId and self.ignored_units[tonumber(unitId)] then
 		self.blacklist[guid] = Player.time + 10
 		return
 	end
@@ -896,13 +908,15 @@ function Ability:ApplyAura(guid)
 	if autoAoe.blacklist[guid] then
 		return
 	end
-	local aura = {
-		expires = Player.time + self:Duration()
-	}
+	local aura = {}
+	aura.expires = Player.time + self:Duration()
 	self.aura_targets[guid] = aura
 end
 
 function Ability:RefreshAura(guid, seconds)
+	if autoAoe.blacklist[guid] then
+		return
+	end
 	local aura = self.aura_targets[guid]
 	if not aura then
 		self:ApplyAura(guid)
@@ -926,6 +940,11 @@ function Ability:RemoveAura(guid)
 end
 
 -- End DoT tracking
+
+--[[
+Note: To get talent_node value for a talent, hover over talent and use macro:
+/dump GetMouseFocus():GetNodeID()
+]]
 
 -- Priest Abilities
 ---- Multiple Specializations
@@ -1143,53 +1162,7 @@ VoidTorrent.cooldown_duration = 30
 local DarkThought = Ability:Add(341205, true, true, 341207)
 DarkThought.buff_duration = 10
 ------ Tier Bonuses
-local LivingShadow = Ability:Add(363469, true, true, 363578) -- T28 4 piece
--- Covenant abilities
-local AscendedBlast = Ability:Add(325283, false, true) -- Kyrian (Boon of the Ascended)
-AscendedBlast.cooldown_duration = 3
-local AscendedNova = Ability:Add(325041, false, true) -- Kyrian (Boon of the Ascended)
-AscendedNova.cooldown_duration = 3
-AscendedNova:AutoAoe()
-local BoonOfTheAscended = Ability:Add(325013, true, true) -- Kyrian
-BoonOfTheAscended.buff_duration = 10
-BoonOfTheAscended.cooldown_duration = 180
-local FirstStrike = Ability:Add(325069, true, true, 325381) -- Night Fae (Korayn Soulbind)
-local Fleshcraft = Ability:Add(324631, true, true, 324867) -- Necrolord
-Fleshcraft.buff_duration = 120
-Fleshcraft.cooldown_duration = 120
-local LeadByExample = Ability:Add(342156, true, true, 342181) -- Necrolord (Emeni Soulbind)
-LeadByExample.buff_duration = 10
-local PustuleEruption = Ability:Add(351094, true, true) -- Necrolord (Emeni Soulbind)
-local SummonSteward = Ability:Add(324739, false, true) -- Kyrian
-SummonSteward.cooldown_duration = 300
-local UnholyNova = Ability:Add(324724, false, true) -- Necrolord
-UnholyNova.cooldown_duration = 60
-UnholyNova.mana_cost = 5
-local UnholyTransfusion = Ability:Add(325203, false, true) -- Necrolord (Unholy Nova DoT)
-UnholyTransfusion.buff_duration = 15
-UnholyTransfusion.tick_interval = 3
-UnholyTransfusion.hasted_ticks = true
-UnholyTransfusion:AutoAoe(false, 'apply')
-UnholyTransfusion:TrackAuras()
-local VolatileSolvent = Ability:Add(323074, true, true) -- Necrolord (Plague Deviser Marileth Soulbind)
-VolatileSolvent.Humanoid = Ability:Add(323491, true, true)
-VolatileSolvent.Humanoid.buff_duration = 120
--- Soulbind conduits
-local DissonantEchoes = Ability:Add(338342, true, true, 343144)
-DissonantEchoes.conduit_id = 115
-DissonantEchoes.buff_duration = 10
-local MindDevourer = Ability:Add(338332, true, true, 338333)
-MindDevourer.conduit_id = 113
-MindDevourer.buff_duration = 15
--- Legendary effects
-local PainbreakerPsalm = Ability:Add(336165, false, true)
-PainbreakerPsalm.bonus_id = 6981
-local ShadowflamePrism = Ability:Add(336143, false, true)
-ShadowflamePrism.bonus_id = 6982
-local ShadowflameRift = Ability:Add(344658, false, true, 344748) -- triggered by Shadowflame Prism
-ShadowflameRift:AutoAoe()
-local Unity = Ability:Add(364911, true, true)
-Unity.bonus_id = 8126
+
 -- PvP talents
 
 -- Racials
@@ -1205,12 +1178,12 @@ SummonedPet.__index = SummonedPet
 local summonedPets = {
 	all = {},
 	known = {},
-	byNpcId = {},
+	byUnitId = {},
 }
 
 function summonedPets:Find(guid)
 	local npcId = guid:match('^Creature%-0%-%d+%-%d+%-%d+%-(%d+)')
-	return npcId and self.byNpcId[tonumber(npcId)]
+	return npcId and self.byUnitId[tonumber(npcId)]
 end
 
 function summonedPets:Purge()
@@ -1370,47 +1343,13 @@ function InventoryItem:Usable(seconds)
 end
 
 -- Inventory Items
-local EternalAugmentRune = InventoryItem:Add(190384)
-EternalAugmentRune.buff = Ability:Add(367405, true, true)
-local EternalFlask = InventoryItem:Add(171280)
-EternalFlask.buff = Ability:Add(307166, true, true)
-local PhialOfSerenity = InventoryItem:Add(177278) -- Provided by Summon Steward
-PhialOfSerenity.max_charges = 3
-local PotionOfPhantomFire = InventoryItem:Add(171349)
-PotionOfPhantomFire.buff = Ability:Add(307495, true, true)
-local PotionOfSpectralIntellect = InventoryItem:Add(171273)
-PotionOfSpectralIntellect.buff = Ability:Add(307162, true, true)
-local SpectralFlaskOfPower = InventoryItem:Add(171276)
-SpectralFlaskOfPower.buff = Ability:Add(307185, true, true)
+
 -- Equipment
 local Trinket1 = InventoryItem:Add(0)
 local Trinket2 = InventoryItem:Add(0)
-Trinket.FleshrendersMeathook = InventoryItem:Add(110002)
-Trinket.SoleahsSecretTechnique = InventoryItem:Add(190958)
-Trinket.SoleahsSecretTechnique.buff = Ability:Add(368512, true, true)
 -- End Inventory Items
 
 -- Start Player API
-
-function Player:Health()
-	return self.health.current
-end
-
-function Player:HealthMax()
-	return self.health.max
-end
-
-function Player:HealthPct()
-	return self.health.current / self.health.max * 100
-end
-
-function Player:ManaDeficit()
-	return self.mana.max - self.mana.current
-end
-
-function Player:ManaPct()
-	return self.mana.current / self.mana.max * 100
-end
 
 function Player:ManaTimeToMax()
 	local deficit = self.mana.max - self.mana.current
@@ -1447,10 +1386,8 @@ function Player:BloodlustActive()
 			id == 90355 or  -- Ancient Hysteria (Hunter Pet - Core Hound)
 			id == 160452 or -- Netherwinds (Hunter Pet - Nether Ray)
 			id == 264667 or -- Primal Rage (Hunter Pet - Ferocity)
-			id == 178207 or -- Drums of Fury (Leatherworking)
-			id == 146555 or -- Drums of Rage (Leatherworking)
-			id == 230935 or -- Drums of the Mountain (Leatherworking)
-			id == 256740    -- Drums of the Maelstrom (Leatherworking)
+			id == 381301 or -- Feral Hide Drums (Leatherworking)
+			id == 390386    -- Fury of the Aspects (Evoker)
 		) then
 			return true
 		end
@@ -1524,7 +1461,7 @@ function Player:UpdateEquipment()
 		end
 	end
 
-	self.set_bonus.t28 = (self:Equipped(188875) and 1 or 0) + (self:Equipped(188878) and 1 or 0) + (self:Equipped(188879) and 1 or 0) + (self:Equipped(188880) and 1 or 0) + (self:Equipped(188881) and 1 or 0)
+	self.set_bonus.t29 = (self:Equipped(200324) and 1 or 0) + (self:Equipped(200326) and 1 or 0) + (self:Equipped(200327) and 1 or 0) + (self:Equipped(200328) and 1 or 0) + (self:Equipped(200329) and 1 or 0)
 end
 
 function Player:UpdateAbilities()
@@ -1534,8 +1471,10 @@ function Player:UpdateAbilities()
 	self.insanity.max = UnitPowerMax('player', 13)
 
 	local node
+	local configId = C_ClassTalents.GetActiveConfigID()
 	for _, ability in next, abilities.all do
 		ability.known = false
+		ability.rank = 0
 		for _, spellId in next, ability.spellIds do
 			ability.spellId, ability.name, _, ability.icon = spellId, GetSpellInfo(spellId)
 			if IsPlayerSpell(spellId) or (ability.learn_spellId and IsPlayerSpell(ability.learn_spellId)) then
@@ -1543,25 +1482,18 @@ function Player:UpdateAbilities()
 				break
 			end
 		end
-		if C_LevelLink.IsSpellLocked(ability.spellId) then
-			ability.known = false -- spell is locked, do not mark as known
-		end
-		if ability.bonus_id then -- used for checking enchants and Legendary crafted effects
+		if ability.bonus_id then -- used for checking enchants and crafted effects
 			ability.known = self:BonusIdEquipped(ability.bonus_id)
 		end
-		if ability.conduit_id then
-			node = C_Soulbinds.FindNodeIDActuallyInstalled(C_Soulbinds.GetActiveSoulbindID(), ability.conduit_id)
+		if ability.talent_node and configId then
+			node = C_Traits.GetNodeInfo(configId, ability.talent_node)
 			if node then
-				node = C_Soulbinds.GetNode(node)
-				if node then
-					if node.conduitID == 0 then
-						self.rescan_abilities = true -- rescan on next target, conduit data has not finished loading
-					else
-						ability.known = node.state == 3
-						ability.rank = node.conduitRank
-					end
-				end
+				ability.rank = node.activeRank
+				ability.known = ability.rank > 0
 			end
+		end
+		if C_LevelLink.IsSpellLocked(ability.spellId) or (ability.check_usable and not IsUsableSpell(ability.spellId)) then
+			ability.known = false -- spell is locked, do not mark as known
 		end
 	end
 
@@ -1615,12 +1547,12 @@ function Player:UpdateAbilities()
 	end
 
 	wipe(summonedPets.known)
-	wipe(summonedPets.byNpcId)
+	wipe(summonedPets.byUnitId)
 	for _, pet in next, summonedPets.all do
 		pet.known = pet.summon_spell and pet.summon_spell.known
 		if pet.known then
 			summonedPets.known[#summonedPets.known + 1] = pet
-			summonedPets.byNpcId[pet.npcId] = pet
+			summonedPets.byUnitId[pet.npcId] = pet
 		end
 	end
 end
@@ -1653,14 +1585,13 @@ function Player:Update()
 	if self.channel.tick_interval > 0 then
 		self.channel.ticks = self.channel.tick_interval > 0 and floor((self.ctime - self.channel.start) / self.channel.tick_interval) or 0
 	end
-	self.health.current = UnitHealth('player')
-	self.health.max = UnitHealthMax('player')
 	self.mana.regen = GetPowerRegen()
 	self.mana.current = UnitPower('player', 0) + (self.mana.regen * self.execute_remains)
 	if self.cast.ability and self.cast.ability.mana_cost > 0 then
 		self.mana.current = self.mana.current - self.cast.ability:Cost()
 	end
 	self.mana.current = min(self.mana.max, max(0, self.mana.current))
+	self.mana.pct = self.mana.current / self.mana.max * 100
 	if Shadowform.known then
 		self.insanity.current = UnitPower('player', 13)
 		if self.cast.ability then
@@ -1693,6 +1624,7 @@ end
 function Player:Init()
 	local _
 	if #UI.glows == 0 then
+		UI:DisableOverlayGlows()
 		UI:CreateOverlayGlows()
 		UI:HookResourceFrame()
 	end
@@ -1870,31 +1802,11 @@ function MindBlast:FreeCast()
 	return DarkThought:Up()
 end
 
-function AscendedBlast:Usable()
-	if BoonOfTheAscended:Down() then
-		return false
-	end
-	return Ability.Usable(self)
-end
-AscendedNova.Usable = AscendedBlast.Usable
-
 -- End Ability Modifications
 
 -- Start Summoned Pet Modifications
 
-function Pet.Shadowfiend:CastLanded(unit, spellId, dstGUID, event, missType)
-	if event == 'SPELL_AURA_APPLIED' or event == 'SPELL_AURA_REFRESH' then
-		if ShadowflameRift:Match(spellId) then -- Shadowflame Rift 1.0s lifetime extension
-			unit.expires = unit.expires + 1
-		end
-		return
-	end
-	if Opt.auto_aoe and ShadowflameRift:Match(spellId) then -- Shadowflame Rift damage
-		ShadowflameRift:RecordTargetHit(dstGUID, event, missType)
-	end
-end
-Pet.Lightspawn.CastLanded = Pet.Shadowfiend.CastLanded
-Pet.Mindbender.CastLanded = Pet.Shadowfiend.CastLanded
+
 
 -- End Summoned Pet Modifications
 
@@ -1923,32 +1835,8 @@ local APL = {
 
 APL[SPEC.DISCIPLINE].Main = function(self)
 	if Player:TimeInCombat() == 0 then
-		if Trinket.SoleahsSecretTechnique.can_use and Trinket.SoleahsSecretTechnique.buff:Remains() < 300 and Trinket.SoleahsSecretTechnique:Usable() and Player.group_size > 1 then
-			UseCooldown(Trinket.SoleahsSecretTechnique)
-		end
-		if SummonSteward:Usable() and PhialOfSerenity:Charges() < 1 then
-			UseExtra(SummonSteward)
-		end
-		if not Player:InArenaOrBattleground() then
-			if EternalAugmentRune:Usable() and EternalAugmentRune.buff:Remains() < 300 then
-				UseCooldown(EternalAugmentRune)
-			end
-			if EternalFlask:Usable() and EternalFlask.buff:Remains() < 300 and SpectralFlaskOfPower.buff:Remains() < 300 then
-				UseCooldown(EternalFlask)
-			end
-			if Opt.pot and SpectralFlaskOfPower:Usable() and SpectralFlaskOfPower.buff:Remains() < 300 and EternalFlask.buff:Remains() < 300 then
-				UseCooldown(SpectralFlaskOfPower)
-			end
-		end
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
-		end
-		if Fleshcraft:Usable() then
-			if PustuleEruption.known or VolatileSolvent.known then
-				UseCooldown(Fleshcraft)
-			elseif Fleshcraft:Remains() < 10 then
-				UseExtra(Fleshcraft)
-			end
 		end
 		if VampiricTouch:Usable() and VampiricTouch:Down() then
 			return VampiricTouch
@@ -1958,10 +1846,10 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend:Up() or (BoonOfTheAscended.known and BoonOfTheAscended:Up())
-	if Player:HealthPct() < 30 and DesperatePrayer:Usable() then
+	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend:Up()
+	if Player.health.pct < 30 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player:HealthPct() < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	end
 	if Player.use_cds and (not PowerInfusion:Ready() or PowerInfusion:Up()) then
@@ -1973,7 +1861,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseCooldown(Trinket.FleshrendersMeathook)
 		end
 	end
-	if Player:ManaPct() < 95 and PowerWordSolace:Usable() then
+	if Player.mana.pct < 95 and PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
 	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > 4 or (PurgeTheWicked.known and Penance:Ready(Target.timeToDie))) then
@@ -1985,14 +1873,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Schism.known and Player.fiend:Usable() and Schism:Ready(3) and Target.timeToDie > 15 then
 		UseCooldown(Player.fiend)
 	end
-	if BoonOfTheAscended.known then
-		if AscendedBlast:Usable(0.2) then
-			return AscendedBlast
-		end
-		if AscendedNova:Usable() and Player.enemies >= 3 then
-			return AscendedNova
-		end
-	end
 	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
 		return Schism
 	end
@@ -2002,7 +1882,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if PowerWordSolace:Usable(0.2) then
 		return PowerWordSolace
 	end
-	if Player.swp:Usable() and ((Schism.known and Schism:Ready(2)) or (BoonOfTheAscended.known and BoonOfTheAscended:Ready(2))) and Player.swp:Remains() < 10 and Target.timeToDie > Player.swp:Remains() + 4 then
+	if Player.swp:Usable() and Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10 and Target.timeToDie > Player.swp:Remains() + 4 then
 		return Player.swp
 	end
 	if DivineStar:Usable() then
@@ -2010,17 +1890,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	end
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
-	end
-	if Player.use_cds and UnholyNova:Usable() then
-		UseCooldown(UnholyNova)
-	end
-	if BoonOfTheAscended.known then
-		if Player.use_cds and BoonOfTheAscended:Usable() and (Target.timeToDie > 10 or Player.enemies > 1) and (not Schism.known or not Schism:Ready(10)) then
-			UseCooldown(BoonOfTheAscended)
-		end
-		if AscendedNova:Usable() then
-			return AscendedNova
-		end
 	end
 	if Player.fiend:Usable() and (Target.timeToDie > 15 or Player.enemies > 1) then
 		UseCooldown(Player.fiend)
@@ -2044,41 +1913,17 @@ end
 
 APL[SPEC.HOLY].Main = function(self)
 	if Player:TimeInCombat() == 0 then
-		if Trinket.SoleahsSecretTechnique.can_use and Trinket.SoleahsSecretTechnique.buff:Remains() < 300 and Trinket.SoleahsSecretTechnique:Usable() and Player.group_size > 1 then
-			UseCooldown(Trinket.SoleahsSecretTechnique)
-		end
-		if SummonSteward:Usable() and PhialOfSerenity:Charges() < 1 then
-			UseExtra(SummonSteward)
-		end
-		if not Player:InArenaOrBattleground() then
-			if EternalAugmentRune:Usable() and EternalAugmentRune.buff:Remains() < 300 then
-				UseCooldown(EternalAugmentRune)
-			end
-			if EternalFlask:Usable() and EternalFlask.buff:Remains() < 300 and SpectralFlaskOfPower.buff:Remains() < 300 then
-				UseCooldown(EternalFlask)
-			end
-			if Opt.pot and SpectralFlaskOfPower:Usable() and SpectralFlaskOfPower.buff:Remains() < 300 and EternalFlask.buff:Remains() < 300 then
-				UseCooldown(SpectralFlaskOfPower)
-			end
-		end
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
-		end
-		if Fleshcraft:Usable() then
-			if PustuleEruption.known or VolatileSolvent.known then
-				UseCooldown(Fleshcraft)
-			elseif Fleshcraft:Remains() < 10 then
-				UseExtra(Fleshcraft)
-			end
 		end
 	else
 		if PowerWordFortitude:Down() and PowerWordFortitude:Usable() then
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if Player:HealthPct() < 30 and DesperatePrayer:Usable() then
+	if Player.health.pct < 30 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif Player:HealthPct() < Opt.pws_threshold and PowerWordShield:Usable() then
+	elseif Player.health.pct < Opt.pws_threshold and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	end
 end
@@ -2098,35 +1943,11 @@ actions.precombat+=/variable,name=mind_sear_cutoff,op=set,value=2
 actions.precombat+=/vampiric_touch,if=!talent.damnation.enabled
 actions.precombat+=/mind_blast,if=talent.damnation.enabled
 ]]
-		if Trinket.SoleahsSecretTechnique.can_use and Trinket.SoleahsSecretTechnique.buff:Remains() < 300 and Trinket.SoleahsSecretTechnique:Usable() and Player.group_size > 1 then
-			UseCooldown(Trinket.SoleahsSecretTechnique)
-		end
-		if SummonSteward:Usable() and PhialOfSerenity:Charges() < 1 then
-			UseExtra(SummonSteward)
-		end
-		if not Player:InArenaOrBattleground() then
-			if EternalAugmentRune:Usable() and EternalAugmentRune.buff:Remains() < 300 then
-				UseCooldown(EternalAugmentRune)
-			end
-			if EternalFlask:Usable() and EternalFlask.buff:Remains() < 300 and SpectralFlaskOfPower.buff:Remains() < 300 then
-				UseCooldown(EternalFlask)
-			end
-			if Opt.pot and SpectralFlaskOfPower:Usable() and SpectralFlaskOfPower.buff:Remains() < 300 and EternalFlask.buff:Remains() < 300 then
-				UseCooldown(SpectralFlaskOfPower)
-			end
-		end
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
 		end
 		if Shadowform:Usable() and Shadowform:Down() then
 			return Shadowform
-		end
-		if Fleshcraft:Usable() then
-			if PustuleEruption.known or VolatileSolvent.known then
-				UseCooldown(Fleshcraft)
-			elseif Fleshcraft:Remains() < 10 then
-				UseExtra(Fleshcraft)
-			end
 		end
 		if VampiricTouch:Usable() and VampiricTouch:Down() and not Damnation.known then
 			return VampiricTouch
@@ -2139,9 +1960,9 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if Player:HealthPct() < 30 and DesperatePrayer:Usable() then
+	if Player.health.pct < 30 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif Player:HealthPct() < Opt.pws_threshold and PowerWordShield:Usable() then
+	elseif Player.health.pct < Opt.pws_threshold and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	end
 --[[
@@ -2224,17 +2045,6 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 	if PowerInfusion:Usable() and ((Voidform:Up() and (not self.five_minutes_viable or not between(Player:TimeInCombat(), 235, 300))) or (Target.boss and Target.timeToDie <= 25)) then
 		return UseCooldown(PowerInfusion)
 	end
-	if VolatileSolvent.known then
-		if Fleshcraft:Channeling() then
-			Player.channel.interrupt_if = self.channel_interrupt[5]
-		end
-		if Fleshcraft:Usable() and VolatileSolvent.Humanoid:Remains() <= (3 * Player.gcd) then
-			return UseCooldown(Fleshcraft)
-		end
-	end
-	if UnholyNova:Usable() and ((not HungeringVoid.known and self.dots_up) or (HungeringVoid.known and HungeringVoid:Up() and Voidform:Up()) or (Voidform:Down() and (not VoidEruption:Ready(15) or not self.cd_management))) then
-		return UseCooldown(UnholyNova)
-	end
 	if VoidEruption:Usable() and self.cd_management and (not VolatileSolvent.known or VolatileSolvent.Humanoid:Up()) and (Player.insanity.current <= 85 or (SearingNightmare.known and self.searing_nightmare_cutoff)) and not Player.fiend:Ready() and ((Player.fiend:Up() and not ShadowWordDeath:Ready()) or not Player.fiend:Ready(Player.gcd * 5) or not ShadowflamePrism.known) and (MindBlast:Charges() == 0 or Player:TimeInCombat() >= 15) then
 		return UseCooldown(VoidEruption)
 	end
@@ -2266,9 +2076,6 @@ actions.trinkets+=/use_items,if=buff.voidform.up|buff.power_infusion.up|cooldown
 	end
 	if Trinket2:Usable() and (Voidform:Up() or PowerInfusion:Up() or not VoidEruption:Ready(10)) then
 		return UseCooldown(Trinket2)
-	end
-	if Trinket.FleshrendersMeathook:Usable() and (PowerInfusion:Up() or (Voidform:Remains() > 10 and not PowerInfusion:Ready(30))) then
-		return UseCooldown(Trinket.FleshrendersMeathook)
 	end
 end
 
@@ -2462,7 +2269,7 @@ end
 -- Start UI API
 
 function UI.DenyOverlayGlow(actionButton)
-	if not Opt.glow.blizzard then
+	if not Opt.glow.blizzard and actionButton.overlay then
 		actionButton.overlay:Hide()
 	end
 end
@@ -2485,6 +2292,17 @@ function UI:UpdateGlowColorAndScale()
 		glow.outerGlow:SetVertexColor(r, g, b)
 		glow.outerGlowOver:SetVertexColor(r, g, b)
 		glow.ants:SetVertexColor(r, g, b)
+	end
+end
+
+function UI:DisableOverlayGlows()
+	if LibStub and LibStub.GetLibrary and not Opt.glow.blizzard then
+		local lib = LibStub:GetLibrary('LibButtonGlow-1.0', true)
+		if lib then
+			lib.ShowOverlayGlow = function(self)
+				return
+			end
+		end
 	end
 end
 
@@ -2558,27 +2376,13 @@ function UI:UpdateGlows()
 end
 
 function UI:UpdateDraggable()
-	propheticPanel:EnableMouse(Opt.aoe or not Opt.locked)
+	local draggable = not (Opt.locked or Opt.snap or Opt.aoe)
+	propheticPanel:EnableMouse(draggable or Opt.aoe)
 	propheticPanel.button:SetShown(Opt.aoe)
-	if Opt.locked then
-		propheticPanel:SetScript('OnDragStart', nil)
-		propheticPanel:SetScript('OnDragStop', nil)
-		propheticPanel:RegisterForDrag(nil)
-		propheticPreviousPanel:EnableMouse(false)
-		propheticCooldownPanel:EnableMouse(false)
-		propheticInterruptPanel:EnableMouse(false)
-		propheticExtraPanel:EnableMouse(false)
-	else
-		if not Opt.aoe then
-			propheticPanel:SetScript('OnDragStart', propheticPanel.StartMoving)
-			propheticPanel:SetScript('OnDragStop', propheticPanel.StopMovingOrSizing)
-			propheticPanel:RegisterForDrag('LeftButton')
-		end
-		propheticPreviousPanel:EnableMouse(true)
-		propheticCooldownPanel:EnableMouse(true)
-		propheticInterruptPanel:EnableMouse(true)
-		propheticExtraPanel:EnableMouse(true)
-	end
+	propheticPreviousPanel:EnableMouse(draggable)
+	propheticCooldownPanel:EnableMouse(draggable)
+	propheticInterruptPanel:EnableMouse(draggable)
+	propheticExtraPanel:EnableMouse(draggable)
 end
 
 function UI:UpdateAlpha()
@@ -2829,18 +2633,19 @@ end
 function events:ADDON_LOADED(name)
 	if name == ADDON then
 		Opt = Prophetic
-		if not Opt.frequency then
-			print('It looks like this is your first time running ' .. ADDON .. ', why don\'t you take some time to familiarize yourself with the commands?')
-			print('Type |cFFFFD000' .. SLASH_Prophetic1 .. '|r for a list of commands.')
-		end
-		if UnitLevel('player') < 10 then
-			print('[|cFFFFD000Warning|r] ' .. ADDON .. ' is not designed for players under level 10, and almost certainly will not operate properly!')
-		end
+		local firstRun = not Opt.frequency
 		InitOpts()
 		UI:UpdateDraggable()
 		UI:UpdateAlpha()
 		UI:UpdateScale()
-		UI:SnapAllPanels()
+		if firstRun then
+			print('It looks like this is your first time running ' .. ADDON .. ', why don\'t you take some time to familiarize yourself with the commands?')
+			print('Type |cFFFFD000' .. SLASH_Braindead1 .. '|r for a list of commands.')
+			UI:SnapAllPanels()
+		end
+		if UnitLevel('player') < 10 then
+			print('[|cFFFFD000Warning|r] ' .. ADDON .. ' is not designed for players under level 10, and almost certainly will not operate properly!')
+		end
 	end
 end
 
@@ -2959,9 +2764,6 @@ end
 
 function events:PLAYER_TARGET_CHANGED()
 	Target:Update()
-	if Player.rescan_abilities then
-		Player:UpdateAbilities()
-	end
 end
 
 function events:UNIT_FACTION(unitId)
@@ -2973,6 +2775,14 @@ end
 function events:UNIT_FLAGS(unitId)
 	if unitId == 'target' then
 		Target:Update()
+	end
+end
+
+function events:UNIT_HEALTH(unitId)
+	if unitId == 'player' then
+		Player.health.current = UnitHealth('player')
+		Player.health.max = UnitHealthMax('player')
+		Player.health.pct = Player.health.current / Player.health.max * 100
 	end
 end
 
@@ -3108,8 +2918,13 @@ function events:PLAYER_SPECIALIZATION_CHANGED(unitId)
 	Player:SetTargetMode(1)
 	events:PLAYER_EQUIPMENT_CHANGED()
 	events:PLAYER_REGEN_ENABLED()
+	events:UNIT_HEALTH('player')
 	UI.OnResourceFrameShow()
 	Player:Update()
+end
+
+function events:TRAIT_CONFIG_UPDATED()
+	events:PLAYER_SPECIALIZATION_CHANGED('player')
 end
 
 function events:SPELL_UPDATE_COOLDOWN()
@@ -3127,18 +2942,6 @@ function events:SPELL_UPDATE_COOLDOWN()
 end
 
 function events:PLAYER_PVP_TALENT_UPDATE()
-	Player:UpdateAbilities()
-end
-
-function events:SOULBIND_ACTIVATED()
-	Player:UpdateAbilities()
-end
-
-function events:SOULBIND_NODE_UPDATED()
-	Player:UpdateAbilities()
-end
-
-function events:SOULBIND_PATH_CHANGED()
 	Player:UpdateAbilities()
 end
 
@@ -3226,18 +3029,25 @@ SlashCmdList[ADDON] = function(msg, editbox)
 			Opt.locked = msg[2] == 'on'
 			UI:UpdateDraggable()
 		end
+		if Opt.aoe or Opt.snap then
+			Status('Warning', 'Panels cannot be moved when aoe or snap are enabled!')
+		end
 		return Status('Locked', Opt.locked)
 	end
 	if startsWith(msg[1], 'snap') then
 		if msg[2] then
 			if msg[2] == 'above' or msg[2] == 'over' then
 				Opt.snap = 'above'
+				Opt.locked = true
 			elseif msg[2] == 'below' or msg[2] == 'under' then
 				Opt.snap = 'below'
+				Opt.locked = true
 			else
 				Opt.snap = false
+				Opt.locked = false
 				propheticPanel:ClearAllPoints()
 			end
+			UI:UpdateDraggable()
 			UI.OnResourceFrameShow()
 		end
 		return Status('Snap to the Personal Resource Display frame', Opt.snap)
