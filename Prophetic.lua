@@ -191,6 +191,8 @@ local Player = {
 	},
 	main_freecast = false,
 	use_cds = false,
+	fiend_remains = 0,
+	fiend_up = false,
 }
 
 -- current target information
@@ -667,7 +669,10 @@ end
 
 function Ability:Cooldown()
 	if self.cooldown_duration > 0 and self:Casting() then
-		return self.cooldown_duration
+		if self.requires_charge and self:Charges() > 0 then
+			return 0
+		end
+		return self:CooldownDuration()
 	end
 	local start, duration = GetSpellCooldown(self.spellId)
 	if start == 0 then
@@ -1039,13 +1044,15 @@ local Rapture = Ability:Add(47536, true, true)
 Rapture.mana_cost = 3.1
 Rapture.buff_duration = 8
 Rapture.cooldown_duration = 90
-local ShadowMend = Ability:Add(186263, false, true)
-ShadowMend.mana_cost = 3.5
-ShadowMend.buff_duration = 10
 local WeakenedSoul = Ability:Add(6788, false, true)
 WeakenedSoul.buff_duration = 6
 WeakenedSoul.auraTarget = 'player'
 ------ Talents
+local Expiation = Ability:Add(390832, true, true)
+Expiation.talent_node = 82585
+local InescapableTorment = Ability:Add(373427, false, true, 373442)
+InescapableTorment.talent_node = 82586
+InescapableTorment:AutoAoe()
 local PurgeTheWicked = Ability:Add(204197, false, true, 204213)
 PurgeTheWicked.buff_duration = 20
 PurgeTheWicked.mana_cost = 1.8
@@ -1057,7 +1064,11 @@ local Schism = Ability:Add(214621, false, true)
 Schism.buff_duration = 9
 Schism.cooldown_duration = 24
 Schism.mana_cost = 0.5
-local SearingLight = Ability:Add(215768, false, true)
+local ShadowCovenant = Ability:Add(314867, true, true, 322105)
+ShadowCovenant.mana_cost = 3.5
+ShadowCovenant.buff_duration = 7
+ShadowCovenant.cooldown_duration = 30
+local TrainOfThought = Ability:Add(390693, false, true)
 local MindbenderDisc = Ability:Add(123040, false, true)
 ------ Procs
 ---- Holy
@@ -1140,11 +1151,10 @@ HungeringVoid.buff_duration = 6
 local MindbenderShadow = Ability:Add(200174, false, true)
 MindbenderShadow.buff_duration = 15
 MindbenderShadow.cooldown_duration = 60
+local MindDevourer = Ability:Add(373202, true, true, 373204)
+MindDevourer.buff_duration = 15
 local Misery = Ability:Add(238558, false, true)
 local PsychicLink = Ability:Add(199484, false, true, 199486)
-local SearingNightmare = Ability:Add(341385, false, true)
-SearingNightmare.insanity_cost = 30
-SearingNightmare.cwc = true
 local ShadowCrash = Ability:Add(205385, false, true, 205386)
 ShadowCrash.cooldown_duration = 30
 ShadowCrash.insanity_gain = 15
@@ -1220,7 +1230,7 @@ function SummonedPet:Add(npcId, duration, summonSpell)
 end
 
 function SummonedPet:Remains(initial)
-	local expires_max, guid, unit = 0
+	local expires_max = 0
 	for guid, unit in next, self.active_units do
 		if (not initial or unit.initial) and unit.expires > expires_max then
 			expires_max = unit.expires
@@ -1272,9 +1282,16 @@ function SummonedPet:RemoveUnit(guid)
 	end
 end
 
+function SummonedPet:ExtendAll(seconds)
+	for guid, unit in next, self.active_units do
+		if unit.expires > Player.time then
+			unit.expires = unit.expires + seconds
+		end
+	end
+end
+
 -- Summoned Pets
 Pet.Lightspawn = SummonedPet:Add(128140, 15, Lightspawn)
-Pet.RattlingMage = SummonedPet:Add(180113, 20, UnholyNova)
 Pet.Shadowfiend = SummonedPet:Add(19668, 15, Shadowfiend)
 Pet.Mindbender = SummonedPet:Add(62982)
 
@@ -1515,14 +1532,6 @@ function Player:UpdateAbilities()
 	MindSear.damage.known = MindSear.known
 	Voidform.known = VoidEruption.known
 	VoidBolt.known = VoidEruption.known
-	ShadowflameRift.known = ShadowflamePrism.known
-	AscendedBlast.known = BoonOfTheAscended.known
-	AscendedNova.known = BoonOfTheAscended.known
-	UnholyTransfusion.known = UnholyNova.known
-	LivingShadow.known = self.set_bonus.t28 >= 4
-	if VolatileSolvent.known then
-		VolatileSolvent.Humanoid.known = true
-	end
 
 	wipe(abilities.bySpellId)
 	wipe(abilities.velocity)
@@ -1619,6 +1628,9 @@ function Player:Update()
 	if self.channel.interrupt_if then
 		self.channel.interruptible = self.channel.interrupt_if()
 	end
+
+	self.fiend_remains = self.fiend:Remains()
+	self.fiend_up = self.fiend_remains > 0
 end
 
 function Player:Init()
@@ -1733,14 +1745,14 @@ end
 
 function Penance:Cooldown()
 	local remains = Ability.Cooldown(self)
-	if SearingLight.known and Smite:Casting() then
-		remains = max(remains - 1, 0)
+	if TrainOfThought.known and Smite:Casting() then
+		remains = remains - 0.5
 	end
-	return remains
+	return max(0, remains)
 end
 
 function VoidBolt:Usable(...)
-	return (Voidform:Up() or (DissonantEchoes.known and DissonantEchoes:Up())) and Ability.Usable(self, ...)
+	return Voidform:Up() and Ability.Usable(self, ...)
 end
 
 function VoidBolt:CastLanded(...)
@@ -1767,8 +1779,13 @@ function ShadowWordPain:Remains()
 	if Misery.known and VampiricTouch:Casting() then
 		return self:Duration()
 	end
-	return Ability.Remains(self)
+	local remains = Ability.Remains(self)
+	if Expiation.known and MindBlast:Casting() then
+		remains = remains - (3 * Expiation.rank)
+	end
+	return max(0, remains)
 end
+PurgeTheWicked.Remains = ShadowWordPain.Remains
 
 function Shadowfiend:Remains()
 	return Pet.Shadowfiend:Remains()
@@ -1790,10 +1807,6 @@ function DevouringPlague:InsanityCost()
 	return Ability.InsanityCost(self)
 end
 
-function SearingNightmare:Usable(...)
-	return MindSear:Channeling() and Ability.Usable(self, ...)
-end
-
 function MindBlast:CastWhileChanneling()
 	return (MindFlay:Channeling() or MindSear:Channeling()) and DarkThought:Up()
 end
@@ -1802,11 +1815,29 @@ function MindBlast:FreeCast()
 	return DarkThought:Up()
 end
 
+function MindBlast:CastLanded(...)
+	if InescapableTorment.known then
+		Pet.Mindbender:ExtendAll(0.5 * InescapableTorment.rank)
+	end
+	Ability.CastLanded(self, ...)
+end
+
+function ShadowWordDeath:CastLanded(...)
+	if InescapableTorment.known then
+		Pet.Mindbender:ExtendAll(0.5 * InescapableTorment.rank)
+	end
+	Ability.CastLanded(self, ...)
+end
+
 -- End Ability Modifications
 
 -- Start Summoned Pet Modifications
 
-
+function Pet.Mindbender:CastLanded(unit, spellId, dstGUID, event, missType)
+	if Opt.auto_aoe and InescapableTorment:Match(spellId) then
+		InescapableTorment:RecordTargetHit(dstGUID, event, missType)
+	end
+end
 
 -- End Summoned Pet Modifications
 
@@ -1846,7 +1877,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend:Up()
+	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend_up
 	if Player.health.pct < 30 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
 	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
@@ -1857,11 +1888,12 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseCooldown(Trinket1)
 		elseif Trinket2:Usable() then
 			UseCooldown(Trinket2)
-		elseif Trinket.FleshrendersMeathook:Usable() then
-			UseCooldown(Trinket.FleshrendersMeathook)
 		end
 	end
-	if Player.mana.pct < 95 and PowerWordSolace:Usable() then
+	if ShadowWordDeath:Usable() and Target.timeToDie < 2 then
+		return ShadowWordDeath
+	end
+	if Player.mana.pct < 50 and PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
 	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > 4 or (PurgeTheWicked.known and Penance:Ready(Target.timeToDie))) then
@@ -1873,11 +1905,31 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Schism.known and Player.fiend:Usable() and Schism:Ready(3) and Target.timeToDie > 15 then
 		UseCooldown(Player.fiend)
 	end
+	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
+		UseCooldown(ShadowCovenant)
+	end
 	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
 		return Schism
 	end
+	if InescapableTorment.known and Player.fiend_up then
+		if ShadowWordDeath:Usable() and Target.health.pct < 20 then
+			return ShadowWordDeath
+		end
+		if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
+			return MindBlast
+		end
+		if ShadowWordDeath:Usable() and Player.fiend_remains < 4 then
+			return ShadowWordDeath
+		end
+		if MindBlast:Usable() and Player.fiend_remains < 4 then
+			return MindBlast
+		end
+	end
 	if Penance:Usable() then
 		return Penance
+	end
+	if DivineStar:Usable() and Player.enemies >= 3 then
+		UseCooldown(DivineStar)
 	end
 	if PowerWordSolace:Usable(0.2) then
 		return PowerWordSolace
@@ -1885,17 +1937,26 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Player.swp:Usable() and Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10 and Target.timeToDie > Player.swp:Remains() + 4 then
 		return Player.swp
 	end
-	if DivineStar:Usable() then
-		UseCooldown(DivineStar)
-	end
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
 	end
 	if Player.fiend:Usable() and (Target.timeToDie > 15 or Player.enemies > 1) then
 		UseCooldown(Player.fiend)
 	end
-	if Player.moving and Player.swp:Usable() and Player.swp:Refreshable() then
+	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > Player.swp:Remains() + 2 then
 		return Player.swp
+	end
+	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(10)) then
+		return ShadowWordDeath
+	end
+	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
+		return MindBlast
+	end
+	if ShadowWordDeath:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(10)) then
+		return ShadowWordDeath
+	end
+	if DivineStar:Usable() then
+		UseCooldown(DivineStar)
 	end
 	if MindBlast:Usable() then
 		return MindBlast
@@ -1935,10 +1996,8 @@ actions.precombat=flask
 actions.precombat+=/food
 actions.precombat+=/augmentation
 actions.precombat+=/snapshot_stats
-actions.precombat+=/fleshcraft,if=soulbind.pustule_eruption|soulbind.volatile_solvent
 actions.precombat+=/shadowform,if=!buff.shadowform.up
 actions.precombat+=/arcane_torrent
-actions.precombat+=/use_item,name=shadowed_orb_of_torment
 actions.precombat+=/variable,name=mind_sear_cutoff,op=set,value=2
 actions.precombat+=/vampiric_touch,if=!talent.damnation.enabled
 actions.precombat+=/mind_blast,if=talent.damnation.enabled
@@ -1971,15 +2030,11 @@ actions+=/antumbra_swap,if=buff.singularity_supreme_lockout.up&!buff.power_infus
 actions+=/antumbra_swap,if=buff.swap_stat_compensation.up&!buff.singularity_supreme_lockout.up&(cooldown.power_infusion.remains<=30&cooldown.void_eruption.remains<=30&!((time>80&time<100)&((fight_remains+time)>=330&time<=200|(fight_remains+time)<=250&(fight_remains+time)>=200))|fight_remains<=40)
 actions+=/variable,name=dots_up,op=set,value=dot.shadow_word_pain.ticking&dot.vampiric_touch.ticking
 actions+=/variable,name=all_dots_up,op=set,value=dot.shadow_word_pain.ticking&dot.vampiric_touch.ticking&dot.devouring_plague.ticking
-actions+=/variable,name=searing_nightmare_cutoff,op=set,value=spell_targets.mind_sear>2+buff.voidform.up
 actions+=/variable,name=five_minutes_viable,op=set,value=(fight_remains+time)>=60*5+20
 actions+=/variable,name=four_minutes_viable,op=set,value=!variable.five_minutes_viable&(fight_remains+time)>=60*4+20
 actions+=/variable,name=do_three_mins,op=set,value=(variable.five_minutes_viable|!variable.five_minutes_viable&!variable.four_minutes_viable)&time<=200
 actions+=/variable,name=cd_management,op=set,value=variable.do_three_mins|(variable.four_minutes_viable&cooldown.power_infusion.remains<=gcd.max*3|variable.five_minutes_viable&time>300)|fight_remains<=25,default=0
 actions+=/variable,name=max_vts,op=set,default=1,value=spell_targets.vampiric_touch
-actions+=/variable,name=max_vts,op=set,value=5+2*(variable.cd_management&cooldown.void_eruption.remains<=10)&talent.hungering_void.enabled,if=talent.searing_nightmare.enabled&spell_targets.mind_sear=7
-actions+=/variable,name=max_vts,op=set,value=0,if=talent.searing_nightmare.enabled&spell_targets.mind_sear>7
-actions+=/variable,name=max_vts,op=set,value=4,if=talent.searing_nightmare.enabled&spell_targets.mind_sear=8&!talent.shadow_crash.enabled
 actions+=/variable,name=max_vts,op=set,value=(spell_targets.mind_sear<=5)*spell_targets.mind_sear,if=buff.voidform.up
 actions+=/variable,name=is_vt_possible,op=set,value=0,default=1
 actions+=/variable,name=is_vt_possible,op=set,value=1,target_if=max:(target.time_to_die*dot.vampiric_touch.refreshable),if=target.time_to_die>=18
@@ -1996,13 +2051,9 @@ actions+=/use_item,name=ring_of_collapsing_futures,if=(buff.temptation.stack<1&t
 actions+=/call_action_list,name=cwc
 actions+=/run_action_list,name=main
 ]]
-	if Opt.pot and Target.boss and not Player:InArenaOrBattleground() and PotionOfSpectralIntellect:Usable() and PowerInfusion:Up() and (Player:BloodlustActive() or (Player:TimeInCombat() + Target.timeToDie) >= 320) then
-		UseCooldown(PotionOfSpectralIntellect)
-	end
 	self.dots_up = ShadowWordPain:Up() and VampiricTouch:Up()
 	self.all_dots_up = self.dots_up and DevouringPlague:Up()
 	self.mind_sear_cutoff = 2
-	self.searing_nightmare_cutoff = Player.enemies > (2 + (Voidform:Up() and 1 or 0))
 	self.five_minutes_viable = (Target.timeToDie + Player:TimeInCombat()) >= (60 * 5 + 20)
 	self.four_minutes_viable = not self.five_minutes_viable and (Target.timeToDie + Player:TimeInCombat()) >= (60 * 4 + 20)
 	self.do_three_mins = (self.five_minutes_viable or not self.four_minutes_viable) and Player:TimeInCombat() <= 200
@@ -2010,14 +2061,6 @@ actions+=/run_action_list,name=main
 	self.max_vts = Player.enemies
 	if Voidform:Up() then
 		self.max_vts = Player.enemies <= 5 and Player.enemies or 0
-	elseif SearingNightmare.known then
-		if Player.enemies == 8 and not ShadowCrash.known then
-			self.max_vts = 4
-		elseif Player.enemies > 7 then
-			self.max_vts = 0
-		elseif Player.enemies == 7 then
-			self.max_vts = 5 + ((self.cd_management and VoidEruption:Ready(10) and HungeringVoid.known) and 2 or 0)
-		end
 	end
 	self.vts_applied = Target.timeToDie < 18 or VampiricTouch:Ticking() >= self.max_vts
 	self.pool_for_cds = VoidEruption:Ready() and self.cd_management
@@ -2032,23 +2075,14 @@ end
 APL[SPEC.SHADOW].cds = function(self)
 --[[
 actions.cds=power_infusion,if=buff.voidform.up&(!variable.five_minutes_viable|time>300|time<235)|fight_remains<=25
-actions.cds+=/fleshcraft,if=soulbind.volatile_solvent&buff.volatile_solvent_humanoid.remains<=3*gcd.max,cancel_if=buff.volatile_solvent_humanoid.up
-actions.cds+=/silence,target_if=runeforge.sephuzs_proclamation.equipped&(target.is_add|target.debuff.casting.react)
-actions.cds+=/fae_guardians,if=!buff.voidform.up&(!cooldown.void_torrent.up|!talent.void_torrent.enabled)&(variable.dots_up&spell_targets.vampiric_touch==1|variable.vts_applied&spell_targets.vampiric_touch>1)|buff.voidform.up&(soulbind.grove_invigoration.enabled|soulbind.field_of_blossoms.enabled)
-actions.cds+=/unholy_nova,if=!talent.hungering_void&variable.dots_up|debuff.hungering_void.up&buff.voidform.up|(cooldown.void_eruption.remains>15|!variable.cd_management)&!buff.voidform.up
-actions.cds+=/boon_of_the_ascended,if=variable.dots_up&(cooldown.fiend.up|!runeforge.shadowflame_prism)
-actions.cds+=/void_eruption,if=variable.cd_management&(!soulbind.volatile_solvent|buff.volatile_solvent_humanoid.up)&(insanity<=85|talent.searing_nightmare.enabled&variable.searing_nightmare_cutoff)&!cooldown.fiend.up&(pet.fiend.active&!cooldown.shadow_word_death.up|cooldown.fiend.remains>=gcd.max*5|!runeforge.shadowflame_prism)&(cooldown.mind_blast.charges=0|time>=15)
 actions.cds+=/call_action_list,name=trinkets
-actions.cds+=/mindbender,if=(talent.searing_nightmare.enabled&spell_targets.mind_sear>variable.mind_sear_cutoff|dot.shadow_word_pain.ticking)&variable.vts_applied
+actions.cds+=/mindbender,if=dot.shadow_word_pain.ticking&variable.vts_applied
 actions.cds+=/desperate_prayer,if=health.pct<=75
 ]]
 	if PowerInfusion:Usable() and ((Voidform:Up() and (not self.five_minutes_viable or not between(Player:TimeInCombat(), 235, 300))) or (Target.boss and Target.timeToDie <= 25)) then
 		return UseCooldown(PowerInfusion)
 	end
-	if VoidEruption:Usable() and self.cd_management and (not VolatileSolvent.known or VolatileSolvent.Humanoid:Up()) and (Player.insanity.current <= 85 or (SearingNightmare.known and self.searing_nightmare_cutoff)) and not Player.fiend:Ready() and ((Player.fiend:Up() and not ShadowWordDeath:Ready()) or not Player.fiend:Ready(Player.gcd * 5) or not ShadowflamePrism.known) and (MindBlast:Charges() == 0 or Player:TimeInCombat() >= 15) then
-		return UseCooldown(VoidEruption)
-	end
-	if MindbenderShadow:Usable() and self.vts_applied and ((SearingNightmare.known and Player.enemies > self.mind_sear_cutoff) or ShadowWordPain:Up()) then
+	if MindbenderShadow:Usable() and self.vts_applied and ShadowWordPain:Up() then
 		return UseCooldown(MindbenderShadow)
 	end
 	if Opt.trinket then
@@ -2081,20 +2115,8 @@ end
 
 APL[SPEC.SHADOW].cwc = function(self)
 --[[
-actions.cwc=mind_blast,only_cwc=1,target_if=set_bonus.tier28_4pc&buff.dark_thought.up&pet.fiend.active&runeforge.shadowflame_prism.equipped&!buff.voidform.up&pet.your_shadow.remains<fight_remains|buff.dark_thought.up&pet.your_shadow.remains<gcd.max*(3+(!buff.voidform.up)*16)&pet.your_shadow.remains<fight_remains
-actions.cwc+=/searing_nightmare,use_while_casting=1,target_if=(variable.searing_nightmare_cutoff&!variable.pool_for_cds)|(dot.shadow_word_pain.refreshable&spell_targets.mind_sear>1)
-actions.cwc+=/searing_nightmare,use_while_casting=1,target_if=talent.searing_nightmare.enabled&dot.shadow_word_pain.refreshable&spell_targets.mind_sear>2
 actions.cwc+=/mind_blast,only_cwc=1
 ]]
-	if MindBlast:Usable() and MindBlast:CastWhileChanneling() and LivingShadow:Remains() < Target.timeToDie and (
-		(LivingShadow.known and ShadowflamePrism.known and Player.fiend:Up() and Voidform:Down()) or
-		(LivingShadow:Remains() < (Player.gcd * (3 + (Voidform:Up() and 0 or 1) * 16)))
-	) then
-		return MindBlast
-	end
-	if SearingNightmare:Usable() and ((self.searing_nightmare_cutoff and not self.pool_for_cds) or (ShadowWordPain:Refreshable() and Player.enemies > 1)) then
-		return SearingNightmare
-	end
 	if MindBlast:Usable() and MindBlast:CastWhileChanneling() then
 		return MindBlast
 	end
@@ -2102,68 +2124,44 @@ end
 
 APL[SPEC.SHADOW].main = function(self)
 --[[
-actions.main=call_action_list,name=boon,if=buff.boon_of_the_ascended.up
-actions.main+=/shadow_word_pain,if=buff.fae_guardians.up&!debuff.wrathful_faerie.up&spell_targets.mind_sear<4
-actions.main+=/mind_sear,target_if=talent.searing_nightmare.enabled&spell_targets.mind_sear>variable.mind_sear_cutoff&!dot.shadow_word_pain.ticking&!cooldown.fiend.up&spell_targets.mind_sear>=4
 actions.main+=/call_action_list,name=cds
-actions.main+=/mind_sear,target_if=talent.searing_nightmare.enabled&spell_targets.mind_sear>variable.mind_sear_cutoff&!dot.shadow_word_pain.ticking&!cooldown.fiend.up
-actions.main+=/damnation,target_if=(dot.vampiric_touch.refreshable|dot.shadow_word_pain.refreshable|(!buff.mind_devourer.up&insanity<50))&(buff.dark_thought.stack<buff.dark_thought.max_stack|!set_bonus.tier28_2pc)
-actions.main+=/shadow_word_death,if=pet.fiend.active&runeforge.shadowflame_prism.equipped&pet.fiend.remains<=gcd&spell_targets.mind_sear<=7
-actions.main+=/mind_blast,if=(cooldown.mind_blast.full_recharge_time<=gcd.max*2&(debuff.hungering_void.up|!talent.hungering_void.enabled)|pet.fiend.remains<=cast_time+gcd)&pet.fiend.active&runeforge.shadowflame_prism.equipped&pet.fiend.remains>cast_time&spell_targets.mind_sear<=7|buff.dark_thought.up&buff.voidform.up&!cooldown.void_bolt.up&(!runeforge.shadowflame_prism.equipped|!pet.fiend.active)&set_bonus.tier28_4pc
+actions.main+=/damnation,target_if=(dot.vampiric_touch.refreshable|dot.shadow_word_pain.refreshable|(!buff.mind_devourer.up&insanity<50))
+actions.main+=/mind_blast,if=(cooldown.mind_blast.full_recharge_time<=gcd.max*2&(debuff.hungering_void.up|!talent.hungering_void.enabled)
 actions.main+=/mindgames,target_if=insanity<90&((variable.all_dots_up&(!cooldown.void_eruption.up|!variable.cd_management))|buff.voidform.up)&(!talent.hungering_void.enabled|debuff.hungering_void.remains>cast_time|!buff.voidform.up)
-actions.main+=/void_bolt,if=talent.hungering_void&(insanity<=85&talent.searing_nightmare&spell_targets.mind_sear<=6|!talent.searing_nightmare|spell_targets.mind_sear=1)
-actions.main+=/devouring_plague,if=(set_bonus.tier28_4pc|talent.hungering_void.enabled)&talent.searing_nightmare.enabled&pet.fiend.active&runeforge.shadowflame_prism.equipped&buff.voidform.up&spell_targets.mind_sear<=6
-actions.main+=/devouring_plague,if=(refreshable|insanity>75|talent.void_torrent.enabled&cooldown.void_torrent.remains<=3*gcd&!buff.voidform.up|buff.voidform.up&(cooldown.mind_blast.charges_fractional<2|buff.mind_devourer.up))&(!variable.pool_for_cds|insanity>=85)&(!talent.searing_nightmare|!variable.searing_nightmare_cutoff)
-actions.main+=/void_bolt,if=talent.hungering_void.enabled&(spell_targets.mind_sear<(4+conduit.dissonant_echoes.enabled)&insanity<=85&talent.searing_nightmare.enabled|!talent.searing_nightmare.enabled)
-actions.main+=/shadow_word_death,target_if=(target.health.pct<20&spell_targets.mind_sear<4)|(pet.fiend.active&runeforge.shadowflame_prism.equipped&spell_targets.mind_sear<=7)
+actions.main+=/void_bolt,if=talent.hungering_void
+actions.main+=/devouring_plague,if=(refreshable|insanity>75|talent.void_torrent.enabled&cooldown.void_torrent.remains<=3*gcd&!buff.voidform.up|buff.voidform.up&(cooldown.mind_blast.charges_fractional<2|buff.mind_devourer.up))&(!variable.pool_for_cds|insanity>=85)
+actions.main+=/void_bolt,if=talent.hungering_void.enabled
+actions.main+=/shadow_word_death,target_if=target.health.pct<20&spell_targets.mind_sear<4)
 actions.main+=/surrender_to_madness,target_if=target.time_to_die<25&buff.voidform.down
 actions.main+=/void_torrent,target_if=variable.dots_up&(buff.voidform.down|buff.voidform.remains<cooldown.void_bolt.remains|prev_gcd.1.void_bolt&!buff.bloodlust.react&spell_targets.mind_sear<3)&variable.vts_applied&spell_targets.mind_sear<(5+(6*talent.twist_of_fate.enabled))
-actions.main+=/shadow_word_death,if=runeforge.painbreaker_psalm.equipped&variable.dots_up&target.time_to_pct_20>(cooldown.shadow_word_death.duration+gcd)
 actions.main+=/shadow_crash,if=raid_event.adds.in>10
 actions.main+=/mind_sear,target_if=spell_targets.mind_sear>variable.mind_sear_cutoff&buff.dark_thought.up,chain=1,interrupt_immediate=1,interrupt_if=ticks>=4
 actions.main+=/mind_flay,if=buff.dark_thought.up&variable.dots_up&!buff.voidform.up&!variable.pool_for_cds&cooldown.mind_blast.full_recharge_time>=gcd.max,chain=1,interrupt_immediate=1,interrupt_if=ticks>=4&!buff.dark_thought.up
-actions.main+=/mind_blast,if=variable.dots_up&raid_event.movement.in>cast_time+0.5&spell_targets.mind_sear<(4+2*talent.misery.enabled+active_dot.vampiric_touch*talent.psychic_link.enabled+(spell_targets.mind_sear>?5)*(pet.fiend.active&runeforge.shadowflame_prism.equipped))&(!runeforge.shadowflame_prism.equipped|!cooldown.fiend.up&runeforge.shadowflame_prism.equipped|variable.vts_applied)
 actions.main+=/void_bolt,if=variable.dots_up
 actions.main+=/vampiric_touch,target_if=refreshable&target.time_to_die>=18&(dot.vampiric_touch.ticking|!variable.vts_applied)&variable.max_vts>0|(talent.misery.enabled&dot.shadow_word_pain.refreshable)|buff.unfurling_darkness.up
 actions.main+=/shadow_word_pain,if=refreshable&target.time_to_die>4&!talent.misery.enabled&talent.psychic_link.enabled&spell_targets.mind_sear>2
-actions.main+=/shadow_word_pain,target_if=refreshable&target.time_to_die>4&!talent.misery.enabled&!(talent.searing_nightmare.enabled&spell_targets.mind_sear>variable.mind_sear_cutoff)&(!talent.psychic_link.enabled|(talent.psychic_link.enabled&spell_targets.mind_sear<=2))
+actions.main+=/shadow_word_pain,target_if=refreshable&target.time_to_die>4&!talent.misery.enabled&(!talent.psychic_link.enabled|(talent.psychic_link.enabled&spell_targets.mind_sear<=2))
 actions.main+=/mind_sear,target_if=spell_targets.mind_sear>variable.mind_sear_cutoff,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2
-actions.main+=/mind_flay,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2&(!buff.dark_thought.up|cooldown.void_bolt.up&(buff.voidform.up|!buff.dark_thought.up&buff.dissonant_echoes.up))
+actions.main+=/mind_flay,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2&(!buff.dark_thought.up|cooldown.void_bolt.up&buff.voidform.up)
 actions.main+=/shadow_word_death
 actions.main+=/shadow_word_pain
 ]]
-	if SearingNightmare.known and MindSear:Usable() and Player.enemies > self.mind_sear_cutoff and ShadowWordPain:Down() and not Player.fiend:Ready() and Player.enemies >= 4 then
-		return MindSear
-	end
 	self:cds()
-	if SearingNightmare.known and MindSear:Usable() and Player.enemies > self.mind_sear_cutoff and ShadowWordPain:Down() and not Player.fiend:Ready() then
-		return MindSear
-	end
-	if Damnation:Usable() and (VampiricTouch:Refreshable() or ShadowWordPain:Refreshable() or (MindDevourer:Down() and Player.insanity.current < 50)) and (DarkThought:Stack() < 3 or Player.set_bonus.t28 < 2) then
+	if Damnation:Usable() and (VampiricTouch:Refreshable() or ShadowWordPain:Refreshable() or (MindDevourer:Down() and Player.insanity.current < 50)) then
 		return Damnation
 	end
-	if ShadowflamePrism.known and ShadowWordDeath:Usable() and Player.fiend:Expiring() and Player.enemies <= 7 then
-		return ShadowWordDeath
-	end
-	if MindBlast:Usable() and (
-		(ShadowflamePrism.known and Player.fiend:Remains() > MindBlast:CastTime() and Player.enemies <= 7 and ((MindBlast:FullRechargeTime() <= (Player.gcd * 2) and (not HungeringVoid.known or HungeringVoid:Up())) or Player.fiend:Remains() <= (MindBlast:CastTime() + Player.gcd))) or
-		(LivingShadow.known and DarkThought:Up() and Voidform:Up() and not VoidBolt:Ready() and (not ShadowflamePrism.known or not Player.fiend:Up()))
-	) then
-		return MindBlast
-	end
-	if HungeringVoid.known and VoidBolt:Usable() and (not SearingNightmare.known or Player.enemies == 1 or (Player.insanity.current <= 85 and Player.enemies <= 6)) then
+	if HungeringVoid.known and VoidBolt:Usable() then
 		return VoidBolt
 	end
 	if DevouringPlague:Usable() and (
-		((LivingShadow.known or HungeringVoid.known) and SearingNightmare.known and ShadowflamePrism.known and Player.enemies <= 6 and Player.fiend:Up() and Voidform:Up()) or
-		((not self.pool_for_cds or Player.insanity.current >= 85) and (not SearingNightmare.known or not self.searing_nightmare_cutoff) and (DevouringPlague:Refreshable() or Player.insanity.current > 75 or (VoidTorrent.known and VoidTorrent:Ready(Player.gcd * 3) and Voidform:Down()) or (Voidform:Up() and (MindBlast:ChargesFractional() < 2 or MindDevourer:Up()))))
+		((not self.pool_for_cds or Player.insanity.current >= 85) and (DevouringPlague:Refreshable() or Player.insanity.current > 75 or (VoidTorrent.known and VoidTorrent:Ready(Player.gcd * 3) and Voidform:Down()) or (Voidform:Up() and (MindBlast:ChargesFractional() < 2 or MindDevourer:Up()))))
 	) then
 		return DevouringPlague
 	end
-	if HungeringVoid.known and VoidBolt:Usable() and (not SearingNightmare.known or (Player.enemies < (4 + (DissonantEchoes.known and 1 or 0)) and Player.insanity.current <= 85)) then
+	if HungeringVoid.known and VoidBolt:Usable() then
 		return VoidBolt
 	end
-	if ShadowWordDeath:Usable() and ((Target.health.pct < 20 and Player.enemies < 4) or (ShadowflamePrism.known and Player.enemies <= 7 and Player.fiend:Up())) then
+	if ShadowWordDeath:Usable() and Target.health.pct < 20 and Player.enemies < 4 then
 		return ShadowWordDeath
 	end
 	if SurrenderToMadness:Usable() and Target.timeToDie < 25 and Voidform:Down() then
@@ -2171,9 +2169,6 @@ actions.main+=/shadow_word_pain
 	end
 	if VoidTorrent:Usable() and self.dots_up and self.vts_applied and Player.enemies < (5 + (TwistOfFate.known and 6 or 0)) and (Voidform:Down() or Voidform:Remains() < VoidBolt:Cooldown() or (VoidBolt:Previous() and not Player:BloodlustActive() and Player.enemies < 3)) then
 		UseCooldown(VoidTorrent)
-	end
-	if ShadowWordDeath:Usable() and PainbreakerPsalm.known and self.dots_up and Target:TimeToPct(20) > (ShadowWordDeath:CooldownDuration() + Player.gcd) then
-		return ShadowWordDeath
 	end
 	if ShadowCrash:Usable() then
 		UseCooldown(ShadowCrash)
@@ -2192,7 +2187,7 @@ actions.main+=/shadow_word_pain
 		end
 		return MindFlay
 	end
-	if MindBlast:Usable() and self.dots_up and Target.timeToDie > MindBlast:CastTime() and Player.enemies < (4 + (Misery.known and 2 or 0) + (PsychicLink.known and VampiricTouch:Ticking() or 0) + (ShadowflamePrism.known and Player.fiend:Up() and min(5, Player.enemies) or 0)) and (not ShadowflamePrism.known or self.vts_applied or not Player.fiend:Ready()) then
+	if MindBlast:Usable() and self.dots_up and Target.timeToDie > MindBlast:CastTime() and Player.enemies < (4 + (Misery.known and 2 or 0) + (PsychicLink.known and VampiricTouch:Ticking() or 0)) then
 		return MindBlast
 	end
 	if VoidBolt:Usable() and self.dots_up then
@@ -2206,7 +2201,7 @@ actions.main+=/shadow_word_pain
 	end
 	if ShadowWordPain:Usable() and not Misery.known and Target.timeToDie > 4 and ShadowWordPain:Refreshable() and (
 		(PsychicLink.known and Player.enemies > 2) or
-		(not (SearingNightmare.known and Player.enemies > self.mind_sear_cutoff) and (not PsychicLink.known or (PsychicLink.known and Player.enemies <= 2)))
+		(not PsychicLink.known or (PsychicLink.known and Player.enemies <= 2))
 	) then
 		return ShadowWordPain
 	end
@@ -2251,10 +2246,7 @@ APL[SPEC.SHADOW].channel_interrupt = {
 		return Player.channel.ticks >= 2
 	end,
 	[4] = function() -- Mind Flay
-		return Player.channel.ticks >= 2 and (DarkThought:Down() or (not VoidBolt:Ready() and (Voidform:Up() or (DarkThought:Down() and DissonantEchoes:Up()))))
-	end,
-	[5] = function() -- Fleshcraft (Volatile Solvent: Humanoid)
-		return VolatileSolvent.Humanoid:Remains() > 100
+		return Player.channel.ticks >= 2 and (DarkThought:Down() or (not VoidBolt:Ready() and Voidform:Up()))
 	end,
 }
 
@@ -2549,12 +2541,6 @@ function UI:UpdateDisplay()
 			remains = unit.expires - Player.time
 			if remains > 0 then
 				text_tr = format('%s%.1fs\n', text_tr, remains)
-			end
-		end
-		if LivingShadow.known then
-			remains = LivingShadow:Remains()
-			if remains > 0 then
-				text_tl = format('%.1fs', remains)
 			end
 		end
 	end
