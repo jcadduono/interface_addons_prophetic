@@ -1012,6 +1012,9 @@ local ShiningForce = Ability:Add(204263, false, true)
 ShiningForce.mana_cost = 2.5
 ShiningForce.cooldown_duration = 45
 ShiningForce.buff_duration = 3
+local VampiricEmbrace = Ability:Add(15286, true, true)
+VampiricEmbrace.buff_duration = 15
+VampiricEmbrace.cooldown_duration = 120
 ------ Procs
 
 ------ Tier Bonuses
@@ -1869,9 +1872,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
 		end
-		if VampiricTouch:Usable() and VampiricTouch:Down() then
-			return VampiricTouch
-		end
 	else
 		if PowerWordFortitude:Down() and PowerWordFortitude:Usable() then
 			UseExtra(PowerWordFortitude)
@@ -1882,6 +1882,8 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		UseExtra(DesperatePrayer)
 	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
+	elseif Player.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
+		UseExtra(VampiricEmbrace)
 	end
 	if Player.use_cds and (not PowerInfusion:Ready() or PowerInfusion:Up()) then
 		if Trinket1:Usable() then
@@ -1986,6 +1988,8 @@ APL[SPEC.HOLY].Main = function(self)
 		UseExtra(DesperatePrayer)
 	elseif Player.health.pct < Opt.pws_threshold and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
+	elseif Player.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
+		UseExtra(VampiricEmbrace)
 	end
 end
 
@@ -2023,6 +2027,8 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 		UseExtra(DesperatePrayer)
 	elseif Player.health.pct < Opt.pws_threshold and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
+	elseif Player.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
+		UseExtra(VampiricEmbrace)
 	end
 --[[
 actions=potion,if=buff.power_infusion.up&(buff.bloodlust.up|(time+fight_remains)>=320)
