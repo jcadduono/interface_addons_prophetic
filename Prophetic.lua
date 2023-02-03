@@ -1892,7 +1892,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseCooldown(Trinket2)
 		end
 	end
-	if ShadowWordDeath:Usable() and Target.timeToDie < 2 then
+	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
 		return ShadowWordDeath
 	end
 	if Player.mana.pct < 50 and PowerWordSolace:Usable() then
@@ -1920,10 +1920,10 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
 			return MindBlast
 		end
-		if ShadowWordDeath:Usable() and Player.fiend_remains < 4 then
+		if ShadowWordDeath:Usable() and Player.fiend_remains < (3 * Player.gcd) then
 			return ShadowWordDeath
 		end
-		if MindBlast:Usable() and Player.fiend_remains < 4 then
+		if MindBlast:Usable() and Player.fiend_remains < (3 * Player.gcd) then
 			return MindBlast
 		end
 	end
@@ -1936,7 +1936,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if PowerWordSolace:Usable(0.2) then
 		return PowerWordSolace
 	end
-	if Player.swp:Usable() and Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10 and Target.timeToDie > Player.swp:Remains() + 4 then
+	if Player.swp:Usable() and Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10 and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
 		return Player.swp
 	end
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
@@ -1945,22 +1945,22 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Player.fiend:Usable() and (Target.timeToDie > 15 or Player.enemies > 1) then
 		UseCooldown(Player.fiend)
 	end
-	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > Player.swp:Remains() + 2 then
+	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
 		return Player.swp
 	end
-	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(10)) then
+	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
 	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
 		return MindBlast
 	end
-	if ShadowWordDeath:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(10)) then
+	if ShadowWordDeath:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
 	end
-	if MindBlast:Usable() then
+	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
 		return MindBlast
 	end
 	if HolyNova:Usable() and Player.enemies >= 3 and Schism:Down() then
