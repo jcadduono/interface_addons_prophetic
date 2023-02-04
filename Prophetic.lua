@@ -1933,13 +1933,13 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		if ShadowWordDeath:Usable() and Target.health.pct < 20 then
 			return ShadowWordDeath
 		end
-		if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
+		if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 and Player.fiend_remains >= MindBlast:CastTime() then
 			return MindBlast
 		end
 		if ShadowWordDeath:Usable() and Player.fiend_remains < (3 * Player.gcd) then
 			return ShadowWordDeath
 		end
-		if MindBlast:Usable() and Player.fiend_remains < (3 * Player.gcd) then
+		if MindBlast:Usable() and Player.fiend_remains < (3 * Player.gcd) and Player.fiend_remains >= MindBlast:CastTime() then
 			return MindBlast
 		end
 	end
