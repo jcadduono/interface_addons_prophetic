@@ -1591,8 +1591,19 @@ function Player:Update()
 	self:UpdateTime()
 	self.haste_factor = 1 / (1 + UnitSpellHaste('player') / 100)
 	self.gcd = 1.5 * self.haste_factor
-	local start, duration = GetSpellCooldown(61304)
+	local _, start, ends, duration, spellId
+	start, duration = GetSpellCooldown(61304)
 	self.gcd_remains = start > 0 and duration - (self.ctime - start) or 0
+	_, _, _, start, ends, _, _, _, spellId = UnitCastingInfo('player')
+	if spellId then
+		self.cast.ability = abilities.bySpellId[spellId]
+		self.cast.start = start / 1000
+		self.cast.ends = ends / 1000
+	else
+		self.cast.ability = nil
+		self.cast.start = 0
+		self.cast.ends = 0
+	end
 	self.execute_remains = max(self.cast.ends - self.ctime, self.gcd_remains)
 	if self.channel.tick_interval > 0 then
 		self.channel.ticks = self.channel.tick_interval > 0 and floor((self.ctime - self.channel.start) / self.channel.tick_interval) or 0
@@ -2782,15 +2793,6 @@ function events:UNIT_SPELLCAST_START(unitId, castGUID, spellId)
 	if Opt.interrupt and unitId == 'target' then
 		UI:UpdateCombatWithin(0.05)
 	end
-	if unitId ~= 'player' then
-		return
-	end
-	local _, _, _, start, ends = UnitCastingInfo(unitId)
-	Player.cast.ability = abilities.bySpellId[spellId]
-	if start and ends then
-		Player.cast.start = start / 1000
-		Player.cast.ends = ends / 1000
-	end
 end
 events.UNIT_SPELLCAST_DELAYED = events.UNIT_SPELLCAST_START
 
@@ -2798,12 +2800,6 @@ function events:UNIT_SPELLCAST_STOP(unitId, castGUID, spellId)
 	if Opt.interrupt and unitId == 'target' then
 		UI:UpdateCombatWithin(0.05)
 	end
-	if unitId ~= 'player' then
-		return
-	end
-	Player.cast.ability = nil
-	Player.cast.start = 0
-	Player.cast.ends = 0
 end
 events.UNIT_SPELLCAST_FAILED = events.UNIT_SPELLCAST_STOP
 events.UNIT_SPELLCAST_INTERRUPTED = events.UNIT_SPELLCAST_STOP
@@ -2812,9 +2808,6 @@ function events:UNIT_SPELLCAST_SUCCEEDED(unitId, castGUID, spellId)
 	if unitId ~= 'player' then
 		return
 	end
-	Player.cast.ability = nil
-	Player.cast.start = 0
-	Player.cast.ends = 0
 	if not spellId or castGUID:sub(6, 6) ~= '3' then
 		return
 	end
