@@ -1008,6 +1008,9 @@ DivineStar:AutoAoe()
 local Halo = Ability:Add(120517, false, true, 120692)
 Halo.mana_cost = 2.7
 Halo.cooldown_duration = 40
+local PowerWordLife = Ability:Add(373481, true, true)
+PowerWordLife.mana_cost = 0.5
+PowerWordLife.cooldown_duration = 30
 local ShiningForce = Ability:Add(204263, false, true)
 ShiningForce.mana_cost = 2.5
 ShiningForce.cooldown_duration = 45
@@ -1889,7 +1892,9 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		end
 	end
 	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend_up
-	if Player.health.pct < 30 and DesperatePrayer:Usable() then
+	if Player.health.pct < 35 and PowerWordLife:Usable() then
+		UseExtra(PowerWordLife)
+	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
 	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
@@ -1995,9 +2000,11 @@ APL[SPEC.HOLY].Main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if Player.health.pct < 30 and DesperatePrayer:Usable() then
+	if Player.health.pct < 35 and PowerWordLife:Usable() then
+		UseExtra(PowerWordLife)
+	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif Player.health.pct < Opt.pws_threshold and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	elseif Player.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
@@ -2034,9 +2041,11 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if Player.health.pct < 30 and DesperatePrayer:Usable() then
+	if Player.health.pct < 35 and PowerWordLife:Usable() then
+		UseExtra(PowerWordLife)
+	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif Player.health.pct < Opt.pws_threshold and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	elseif Player.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
