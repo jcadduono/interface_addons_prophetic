@@ -1981,7 +1981,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
 		return ShadowWordDeath
 	end
-	if InescapableTorment.known and Player.fiend_up and Player.fiend_remains < (2 * Player.gcd) then
+	if InescapableTorment.known and Player.fiend_up and Player.fiend_remains < (3 * Player.gcd) then
 		local apl = self:torment()
 		if apl then return apl end
 	end
