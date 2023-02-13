@@ -2000,9 +2000,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseCooldown(PowerInfusion)
 		end
 	end
-	if Schism.known and Player.fiend:Usable() and Schism:Ready(3) and Target.timeToDie > 15 then
-		UseCooldown(Player.fiend)
-	end
 	if TwilightEquilibrium.known then
 		if TwilightEquilibrium.Holy:Up() then
 			local apl = self:te_holy()
@@ -2014,9 +2011,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	end
 	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
 		UseCooldown(ShadowCovenant)
-	end
-	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
-		return Schism
 	end
 	if InescapableTorment.known and Player.fiend_up then
 		local apl = self:torment()
@@ -2049,7 +2043,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
 	end
-	if Player.fiend:Usable() and (Target.timeToDie > 15 or Player.enemies > 1) then
+	if Player.fiend:Usable() and (Target.boss or Target.timeToDie > 15 or Player.enemies > 1) then
 		UseCooldown(Player.fiend)
 	end
 	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
@@ -2133,9 +2127,6 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
 		UseCooldown(ShadowCovenant)
 	end
-	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
-		return Schism
-	end
 	if InescapableTorment.known and Player.fiend_up then
 		local apl = self:torment()
 		if apl then return apl end
@@ -2155,7 +2146,7 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
 	end
-	if Player.fiend:Usable() and (Target.timeToDie > 15 or Player.enemies > 1) then
+	if Player.fiend:Usable() and (Target.boss or Target.timeToDie > 15 or Player.enemies > 1) then
 		UseCooldown(Player.fiend)
 	end
 	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
@@ -2185,6 +2176,12 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 end
 
 APL[SPEC.DISCIPLINE].torment = function(self)
+	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.8 and Player.fiend_remains >= MindBlast:CastTime() then
+		return MindBlast
+	end
+	if Schism:Usable() and Player.fiend_remains > (3 * Player.gcd) then
+		return Schism
+	end
 	if ShadowWordDeath:Usable() and Target.health.pct < 20 then
 		return ShadowWordDeath
 	end
