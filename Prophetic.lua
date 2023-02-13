@@ -885,10 +885,6 @@ function Ability:CastLanded(dstGUID, event, missType)
 	end
 end
 
-function Ability:Equilibrium()
-	return self.equilibrium
-end
-
 -- Start DoT tracking
 
 local trackAuras = {}
@@ -1008,15 +1004,26 @@ local Smite = Ability:Add(585, false, true, 208772)
 Smite.mana_cost = 0.2
 Smite.equilibrium = 'holy'
 ------ Talents
-local DivineStar = Ability:Add(110744, false, true, 110745)
+local DivineStar = Ability:Add(110744, false, true, 122128)
 DivineStar.mana_cost = 2
 DivineStar.cooldown_duration = 15
 DivineStar.equilibrium = 'holy'
 DivineStar:AutoAoe()
-local Halo = Ability:Add(120517, false, true, 120692)
+DivineStar.Shadow = Ability:Add(122121, false, true, 390845)
+DivineStar.Shadow.mana_cost = 2
+DivineStar.Shadow.cooldown_duration = 15
+DivineStar.Shadow.equilibrium = 'shadow'
+DivineStar.Shadow:AutoAoe()
+local Halo = Ability:Add(120517, false, true, 120696)
 Halo.mana_cost = 2.7
 Halo.cooldown_duration = 40
 Halo.equilibrium = 'holy'
+Halo:AutoAoe()
+Halo.Shadow = Ability:Add(120644, false, true, 390964)
+Halo.Shadow.mana_cost = 2.7
+Halo.Shadow.cooldown_duration = 40
+Halo.Shadow.equilibrium = 'shadow'
+Halo.Shadow:AutoAoe()
 local PowerWordLife = Ability:Add(373481, true, true)
 PowerWordLife.mana_cost = 0.5
 PowerWordLife.cooldown_duration = 30
@@ -1045,6 +1052,13 @@ Penance.cooldown_duration = 9
 Penance.hasted_duration = true
 Penance.channel_fully = true
 Penance.equilibrium = 'holy'
+local DarkReprimand = Ability:Add(400169, false, true, 373130)
+DarkReprimand.mana_cost = 1.6
+DarkReprimand.buff_duration = 2
+DarkReprimand.cooldown_duration = 9
+DarkReprimand.hasted_duration = true
+DarkReprimand.channel_fully = true
+DarkReprimand.equilibrium = 'shadow'
 local PowerWordBarrier = Ability:Add(62618, true, true, 81782)
 PowerWordBarrier.mana_cost = 4
 PowerWordBarrier.buff_duration = 10
@@ -1556,6 +1570,11 @@ function Player:UpdateAbilities()
 		self.fiend = Lightspawn
 	end
 	Shadowfiend.known = Shadowfiend.known and self.fiend == Shadowfiend
+	if ShadowCovenant.known then
+		DivineStar.Shadow.known = DivineStar.known
+		Halo.Shadow.known = Halo.known
+		DarkReprimand.known = Penance.known
+	end
 	MindSear.damage.known = MindSear.known
 	Voidform.known = VoidEruption.known
 	VoidBolt.known = VoidEruption.known
@@ -1784,6 +1803,25 @@ function Penance:Cooldown()
 	end
 	return max(0, remains)
 end
+DarkReprimand.Cooldown = Penance.Cooldown
+
+function Penance:Usable()
+	if ShadowCovenant.known and ShadowCovenant:Up() then
+		return false
+	end
+	return Ability.Usable(self)
+end
+DivineStar.Usable = Penance.Usable
+Halo.Usable = Penance.Usable
+
+function DarkReprimand:Usable()
+	if ShadowCovenant.known and ShadowCovenant:Down() then
+		return false
+	end
+	return Ability.Usable(self)
+end
+DivineStar.Shadow.Usable = DarkReprimand.Usable
+Halo.Shadow.Usable = DarkReprimand.Usable
 
 function VoidBolt:Usable(...)
 	return Voidform:Up() and Ability.Usable(self, ...)
@@ -1863,21 +1901,11 @@ function ShadowWordDeath:CastLanded(...)
 	Ability.CastLanded(self, ...)
 end
 
-function Penance:Equilibrium()
-	if ShadowCovenant.known and ShadowCovenant:Up() then
-		return 'shadow'
-	end
-	return self.equilibrium
-end
-DivineStar.Equilibrium = Penance.Equilibrium
-Halo.Equilibrium = Penance.Equilibrium
-
 function TwilightEquilibrium.Holy:Remains()
 	if Player.cast.ability then
-		local equilibrium = Player.cast.ability:Equilibrium()
-		if equilibrium == 'holy' then
+		if Player.cast.ability.equilibrium == 'holy' then
 			return 0
-		elseif equilibrium == 'shadow' then
+		elseif Player.cast.ability.equilibrium == 'shadow' then
 			return self:Duration()
 		end
 	end
@@ -1886,10 +1914,9 @@ end
 
 function TwilightEquilibrium.Shadow:Remains()
 	if Player.cast.ability then
-		local equilibrium = Player.cast.ability:Equilibrium()
-		if equilibrium == 'shadow' then
+		if Player.cast.ability.equilibrium == 'shadow' then
 			return 0
-		elseif equilibrium == 'holy' then
+		elseif Player.cast.ability.equilibrium == 'holy' then
 			return self:Duration()
 		end
 	end
@@ -1942,7 +1969,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		end
 	end
 	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend_up
-	self.scov_up = ShadowCovenant.known and ShadowCovenant:Up()
 	if Player.health.pct < 35 and PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
@@ -1982,7 +2008,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > 4 or (PurgeTheWicked.known and Penance:Ready(Target.timeToDie))) then
 		return Player.swp
 	end
-	if ShadowCovenant:Usable() and not self.scov_up then
+	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
 		UseCooldown(ShadowCovenant)
 	end
 	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
@@ -2005,8 +2031,20 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Penance:Usable() then
 		return Penance
 	end
+	if DarkReprimand:Usable() then
+		return DarkReprimand
+	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
+	end
+	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
+		UseCooldown(DivineStar.Shadow)
+	end
+	if Halo:Usable() and Player.enemies >= 3 then
+		UseCooldown(Halo)
+	end
+	if Halo.Shadow:Usable() and Player.enemies >= 3 then
+		UseCooldown(Halo.Shadow)
 	end
 	if PowerWordSolace:Usable(0.2) then
 		return PowerWordSolace
@@ -2035,6 +2073,15 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
 	end
+	if DivineStar.Shadow:Usable() then
+		UseCooldown(DivineStar.Shadow)
+	end
+	if Halo:Usable() then
+		UseCooldown(Halo)
+	end
+	if Halo.Shadow:Usable() then
+		UseCooldown(Halo.Shadow)
+	end
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
 		return MindBlast
 	end
@@ -2053,10 +2100,10 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if PurgeTheWicked:Usable() and PurgeTheWicked:Down() and (Target.timeToDie > 4 or Penance:Ready(Target.timeToDie)) then
 		return PurgeTheWicked
 	end
-	if not self.scov_up and Penance:Usable() then
+	if Penance:Usable() then
 		return Penance
 	end
-	if not self.scov_up and DivineStar:Usable() and Player.enemies >= 3 then
+	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
 	end
 	if PowerWordSolace:Usable(0.2) then
@@ -2065,8 +2112,11 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if PurgeTheWicked:Usable() and Schism.known and Schism:Ready(Player.gcd * 2) and PurgeTheWicked:Remains() < 10 and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
 		return PurgeTheWicked
 	end
-	if not self.scov_up and DivineStar:Usable() then
+	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
+	end
+	if Halo:Usable() then
+		UseCooldown(Halo)
 	end
 	if PurgeTheWicked:Usable() and PurgeTheWicked:Refreshable() and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
 		return PurgeTheWicked
@@ -2083,7 +2133,7 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 end
 
 APL[SPEC.DISCIPLINE].te_shadow = function(self)
-	if ShadowCovenant:Usable() and not self.scov_up then
+	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
 		UseCooldown(ShadowCovenant)
 	end
 	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
@@ -2109,11 +2159,14 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 			return MindBlast
 		end
 	end
-	if self.scov_up and Penance:Usable() then
-		return Penance
+	if DarkReprimand:Usable() then
+		return DarkReprimand
 	end
-	if self.scov_up and DivineStar:Usable() and Player.enemies >= 3 then
-		UseCooldown(DivineStar)
+	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
+		UseCooldown(DivineStar.Shadow)
+	end
+	if Halo.Shadow:Usable() and Player.enemies >= 3 then
+		UseCooldown(Halo.Shadow)
 	end
 	if ShadowWordPain:Usable() and Schism.known and Schism:Ready(2) and ShadowWordPain:Remains() < 10 and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
 		return ShadowWordPain
@@ -2133,8 +2186,11 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if ShadowWordDeath:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
-	if self.scov_up and DivineStar:Usable() then
-		UseCooldown(DivineStar)
+	if DivineStar.Shadow:Usable() then
+		UseCooldown(DivineStar.Shadow)
+	end
+	if Halo.Shadow:Usable() then
+		UseCooldown(Halo.Shadow)
 	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Refreshable() and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
 		return ShadowWordPain
