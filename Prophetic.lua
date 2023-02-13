@@ -1978,6 +1978,16 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	elseif Player.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
+	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
+		return ShadowWordDeath
+	end
+	if InescapableTorment.known and Player.fiend_up and Player.fiend_remains < (2 * Player.gcd) then
+		local apl = self:torment()
+		if apl then return apl end
+	end
+	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > (Player.swp:TickTime() * 2) or (PurgeTheWicked.known and Penance:Ready(Target.timeToDie))) then
+		return Player.swp
+	end
 	if Player.use_cds then
 		if Opt.trinket and (not PowerInfusion:Ready(35) or PowerInfusion:Up() or (Target.boss and Target.timeToDie < 25)) then
 			if Trinket1:Usable() then
@@ -2002,12 +2012,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			if apl then return apl end
 		end
 	end
-	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
-		return ShadowWordDeath
-	end
-	if Player.swp:Usable() and Player.swp:Down() and (Target.timeToDie > 4 or (PurgeTheWicked.known and Penance:Ready(Target.timeToDie))) then
-		return Player.swp
-	end
 	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
 		UseCooldown(ShadowCovenant)
 	end
@@ -2015,18 +2019,8 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 		return Schism
 	end
 	if InescapableTorment.known and Player.fiend_up then
-		if ShadowWordDeath:Usable() and Target.health.pct < 20 then
-			return ShadowWordDeath
-		end
-		if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 and Player.fiend_remains >= MindBlast:CastTime() then
-			return MindBlast
-		end
-		if ShadowWordDeath:Usable() and Player.fiend_remains < (3 * Player.gcd) then
-			return ShadowWordDeath
-		end
-		if MindBlast:Usable() and Player.fiend_remains < (3 * Player.gcd) and Player.fiend_remains >= MindBlast:CastTime() then
-			return MindBlast
-		end
+		local apl = self:torment()
+		if apl then return apl end
 	end
 	if Penance:Usable() then
 		return Penance
@@ -2097,9 +2091,6 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 end
 
 APL[SPEC.DISCIPLINE].te_holy = function(self)
-	if PurgeTheWicked:Usable() and PurgeTheWicked:Down() and (Target.timeToDie > 4 or Penance:Ready(Target.timeToDie)) then
-		return PurgeTheWicked
-	end
 	if Penance:Usable() then
 		return Penance
 	end
@@ -2136,28 +2127,12 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
 		UseCooldown(ShadowCovenant)
 	end
-	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
-		return ShadowWordDeath
-	end
-	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 2) then
-		return ShadowWordPain
-	end
 	if Schism:Usable() and not Player.moving and Target.timeToDie > 4 and Player.swp:Remains() > 10 then
 		return Schism
 	end
 	if InescapableTorment.known and Player.fiend_up then
-		if ShadowWordDeath:Usable() and Target.health.pct < 20 then
-			return ShadowWordDeath
-		end
-		if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 and Player.fiend_remains >= MindBlast:CastTime() then
-			return MindBlast
-		end
-		if ShadowWordDeath:Usable() and Target:TimeToPct(20) > Player.fiend_remains then
-			return ShadowWordDeath
-		end
-		if MindBlast:Usable() and Player.fiend_remains >= MindBlast:CastTime() then
-			return MindBlast
-		end
+		local apl = self:torment()
+		if apl then return apl end
 	end
 	if DarkReprimand:Usable() then
 		return DarkReprimand
@@ -2200,6 +2175,21 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	end
 	if ShadowWordPain:Usable() then
 		return ShadowWordPain
+	end
+end
+
+APL[SPEC.DISCIPLINE].torment = function(self)
+	if ShadowWordDeath:Usable() and Target.health.pct < 20 then
+		return ShadowWordDeath
+	end
+	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 and Player.fiend_remains >= MindBlast:CastTime() then
+		return MindBlast
+	end
+	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > Player.fiend_remains then
+		return ShadowWordDeath
+	end
+	if MindBlast:Usable() and Player.fiend_remains >= MindBlast:CastTime() then
+		return MindBlast
 	end
 end
 
