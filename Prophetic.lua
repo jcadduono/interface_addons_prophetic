@@ -2079,11 +2079,14 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if HolyNova:Usable() and Player.enemies >= 3 and Schism:Down() then
+	if HolyNova:Usable() and Player.enemies >= 3 then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
 		return Smite
+	end
+	if HolyNova:Usable() then
+		UseCooldown(HolyNova)
 	end
 	if Player.swp:Usable() then
 		return Player.swp
@@ -2112,11 +2115,14 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if PurgeTheWicked:Usable() and PurgeTheWicked:Refreshable() and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
 		return PurgeTheWicked
 	end
-	if HolyNova:Usable() and Player.enemies >= 3 and Schism:Down() then
+	if HolyNova:Usable() and Player.enemies >= 3 then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
 		return Smite
+	end
+	if HolyNova:Usable() then
+		UseCooldown(HolyNova)
 	end
 	if PurgeTheWicked:Usable() then
 		return PurgeTheWicked
