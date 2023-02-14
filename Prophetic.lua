@@ -2115,12 +2115,6 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if Smite:Usable() then
 		return Smite
 	end
-	if HolyNova:Usable() then
-		UseCooldown(HolyNova)
-	end
-	if PurgeTheWicked:Usable() then
-		return PurgeTheWicked
-	end
 end
 
 APL[SPEC.DISCIPLINE].te_shadow = function(self)
@@ -2169,9 +2163,6 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	end
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
 		return MindBlast
-	end
-	if ShadowWordPain:Usable() then
-		return ShadowWordPain
 	end
 end
 
