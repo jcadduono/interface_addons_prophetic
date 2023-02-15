@@ -1968,7 +1968,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	Player.use_cds = Target.boss or Target.timeToDie > 20 or PowerInfusion:Up() or Player.fiend_up
+	Player.use_cds = Target.boss or Target.timeToDie > Opt.cd_ttd or PowerInfusion:Up() or Player.fiend_up
 	if Player.health.pct < 35 and PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
@@ -2049,13 +2049,13 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
 		return Player.swp
 	end
-	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
+	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or Target.timeToDie < (Player.fiend:Cooldown() / 2) or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
 	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
 		return MindBlast
 	end
-	if ShadowWordDeath:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
+	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
 	if DivineStar:Usable() then
@@ -2143,13 +2143,13 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if Player.fiend:Usable() and (Target.boss or Target.timeToDie > 15 or Player.enemies > 1) then
 		UseCooldown(Player.fiend)
 	end
-	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
+	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or Target.timeToDie < (Player.fiend:Cooldown() / 2) or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
 	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
 		return MindBlast
 	end
-	if ShadowWordDeath:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
+	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
 	if DivineStar.Shadow:Usable() then
