@@ -1789,7 +1789,7 @@ function Target:TimeToPct(pct)
 	if self.health.loss_per_sec <= 0 then
 		return self.timeToDieMax
 	end
-	return min(self.timeToDieMax, (self.health.current - (self.health.max * (self.health.pct / 100))) / self.health.loss_per_sec)
+	return min(self.timeToDieMax, (self.health.current - (self.health.max * (pct / 100))) / self.health.loss_per_sec)
 end
 
 -- End Target API
@@ -2179,7 +2179,7 @@ APL[SPEC.DISCIPLINE].torment = function(self)
 	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 and Player.fiend_remains >= MindBlast:CastTime() then
 		return MindBlast
 	end
-	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > Player.fiend_remains then
+	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > (Player.fiend_remains - Player.gcd) then
 		return ShadowWordDeath
 	end
 	if MindBlast:Usable() and Player.fiend_remains >= MindBlast:CastTime() then
