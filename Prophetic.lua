@@ -1027,10 +1027,7 @@ Halo.Shadow:AutoAoe()
 local PowerWordLife = Ability:Add(373481, true, true)
 PowerWordLife.mana_cost = 0.5
 PowerWordLife.cooldown_duration = 30
-local ShiningForce = Ability:Add(204263, false, true)
-ShiningForce.mana_cost = 2.5
-ShiningForce.cooldown_duration = 45
-ShiningForce.buff_duration = 3
+local Rhapsody = Ability:Add(390622, true, true, 390636)
 local VampiricEmbrace = Ability:Add(15286, true, true)
 VampiricEmbrace.buff_duration = 15
 VampiricEmbrace.cooldown_duration = 120
@@ -1959,6 +1956,13 @@ local APL = {
 }
 
 APL[SPEC.DISCIPLINE].Main = function(self)
+--[[
+actions.precombat=flask
+actions.precombat+=/food
+actions.precombat+=/augmentation
+# Snapshot raid buffed stats before combat begins and pre-potting is done.
+actions.precombat+=/snapshot_stats
+]]
 	if Player:TimeInCombat() == 0 then
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
@@ -1978,6 +1982,22 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	elseif Player.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
+--[[
+actions=shadow_word_death,target_if=target.time_to_die<(2*gcd)
+actions+=/call_action_list,name=torment,if=talent.inescapable_torment.enabled&pet.fiend.active&pet.fiend.remains<(3*gcd)
+actions+=/shadow_word_pain,if=!remains&(target.time_to_die>(tick_time*2)|(talent.purge_the_wicked.enabled&cooldown.penance.remains<target.time_to_die))
+actions+=/use_items,if=cooldown.power_infusion.remains>35|buff.power_infusion.up|fight_remains<25
+actions+=/power_infusion
+actions+=/call_action_list,name=te_holy,if=talent.twilight_equilibrium.enabled&buff.twilight_equilibrium_holy.up
+actions+=/call_action_list,name=te_shadow,if=talent.twilight_equilibrium.enabled&buff.twilight_equilibrium_shadow.up
+actions+=/shadow_covenant,if=down
+actions+=/call_action_list,name=torment,if=talent.inescapable_torment.enabled&pet.fiend.active
+actions+=/penance
+actions+=/dark_reprimand
+actions+=/divine_star,if=spell_targets.divine_star>=3|talent.rhapsody.enabled&buff.rhapsody.stack>=18
+actions+=/halo,if=spell_targets.halo>=3
+actions+=/power_word_solace
+]]
 	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
 		return ShadowWordDeath
 	end
@@ -2073,7 +2093,7 @@ APL[SPEC.DISCIPLINE].Main = function(self)
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if HolyNova:Usable() and Player.enemies >= 3 then
+	if HolyNova:Usable() and (Player.enemies >= 3 or (Rhapsody.known and Rhapsody:Stack() >= 18)) then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
@@ -2109,7 +2129,7 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if PurgeTheWicked:Usable() and PurgeTheWicked:Refreshable() and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
 		return PurgeTheWicked
 	end
-	if HolyNova:Usable() and Player.enemies >= 3 then
+	if HolyNova:Usable() and (Player.enemies >= 3 or (Rhapsody.known and Rhapsody:Stack() >= 18)) then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
@@ -2167,6 +2187,14 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 end
 
 APL[SPEC.DISCIPLINE].torment = function(self)
+--[[
+actions.torment=mind_blast,if=charges_fractional>1.8&pet.fiend.remains>=execute_time
+actions.torment+=/schism,if=pet.fiend.remains>(3*gcd)
+actions.torment+=/shadow_word_death,target_if=min:target.time_to_die,if=target.health.pct<20
+actions.torment+=/mind_blast,if=charges_fractional>1.5&pet.fiend.remains>=execute_time
+actions.torment+=/shadow_word_death,target_if=min:target.time_to_die,if=target.time_to_pct_20>(pet.fiend.remains-gcd)
+actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
+]]
 	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.8 and Player.fiend_remains >= MindBlast:CastTime() then
 		return MindBlast
 	end
