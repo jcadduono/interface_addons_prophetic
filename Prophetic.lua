@@ -2072,6 +2072,11 @@ actions.precombat+=/snapshot_stats
 			UseExtra(PowerWordFortitude)
 		end
 	end
+	self.use_cds = Opt.cooldown and (
+		(Target.boss or Target.player or (not Opt.boss_only and Target.timeToDie > (Opt.cd_ttd - min(Player.enemies - 1, 6)))) or
+		(PowerInfusion.known and PowerInfusion:Remains() > 10) or
+		(Player.fiend_remains > 5)
+	)
 	self.use_cds = Target.boss or Target.timeToDie > Opt.cd_ttd or PowerInfusion:Up() or Player.fiend_up
 	if Player.health.pct < 35 and PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
@@ -2166,7 +2171,7 @@ actions+=/power_word_solace
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
 	end
-	if Player.fiend:Usable() and (Target.boss or Target.timeToDie > 15 or Player.enemies > 1) then
+	if self.use_cds and Player.fiend:Usable() then
 		UseCooldown(Player.fiend)
 	end
 	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
@@ -2266,7 +2271,7 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
 		return Schism
 	end
-	if Player.fiend:Usable() and (Target.boss or Target.timeToDie > 15 or Player.enemies > 1) then
+	if self.use_cds and Player.fiend:Usable() then
 		UseCooldown(Player.fiend)
 	end
 	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or Target.timeToDie < (Player.fiend:Cooldown() / 2) or not Player.fiend:Ready(14 * Player.haste_factor)) then
