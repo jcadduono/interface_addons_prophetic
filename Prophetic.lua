@@ -255,6 +255,9 @@ local Player = {
 	fiend_up = false,
 }
 
+-- current pet information (used only to store summoned pets for priests)
+local Pet = {}
+
 -- current target information
 local Target = {
 	boss = false,
@@ -2151,7 +2154,10 @@ actions+=/power_word_solace
 	if Halo.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(Halo.Shadow)
 	end
-	if PowerWordSolace:Usable(0.2) then
+	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= 18 then
+		UseCooldown(HolyNova)
+	end
+	if PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
 	if Player.swp:Usable() and Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10 and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
@@ -2211,7 +2217,10 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
 	end
-	if PowerWordSolace:Usable(0.2) then
+	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= 18 then
+		UseCooldown(HolyNova)
+	end
+	if PowerWordSolace:Usable() then
 		return PowerWordSolace
 	end
 	if PurgeTheWicked:Usable() and Schism.known and Schism:Ready(Player.gcd * 2) and PurgeTheWicked:Remains() < 10 and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
