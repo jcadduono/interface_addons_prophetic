@@ -2125,15 +2125,23 @@ actions+=/power_word_solace
 			UseCooldown(PowerInfusion)
 		end
 	end
+	local apl
 	if TwilightEquilibrium.known then
 		if TwilightEquilibrium.Holy:Up() then
-			local apl = self:te_holy()
+			apl = self:te_holy()
 			if apl then return apl end
 		elseif TwilightEquilibrium.Shadow:Up() then
-			local apl = self:te_shadow()
+			apl = self:te_shadow()
 			if apl then return apl end
 		end
+	else
+		apl = self:standard()
+		if apl then return apl end
 	end
+	return self:filler()
+end
+
+APL[SPEC.DISCIPLINE].standard = function(self)
 	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
 		UseCooldown(ShadowCovenant)
 	end
@@ -2198,16 +2206,25 @@ actions+=/power_word_solace
 	if Halo.Shadow:Usable() then
 		UseCooldown(Halo.Shadow)
 	end
+end
+
+APL[SPEC.DISCIPLINE].filler = function(self)
+	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
+		return Player.swp
+	end
+	if PowerWordSolace:Usable() then
+		return PowerWordSolace
+	end
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if HolyNova:Usable() and (Player.enemies >= 3 or (Rhapsody.known and Rhapsody:Stack() >= 18)) then
+	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and (Player.enemies >= 3 or (Rhapsody.known and Rhapsody:Stack() >= 18)) then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
 		return Smite
 	end
-	if HolyNova:Usable() then
+	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) then
 		UseCooldown(HolyNova)
 	end
 	if Player.swp:Usable() then
