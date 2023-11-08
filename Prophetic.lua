@@ -1144,7 +1144,6 @@ Rapture.cooldown_duration = 90
 local Expiation = Ability:Add(390832, true, true)
 Expiation.talent_node = 82585
 local InescapableTorment = Ability:Add(373427, false, true, 373442)
-InescapableTorment.talent_node = 82586
 InescapableTorment:AutoAoe()
 local MindbenderDisc = Ability:Add(123040, false, true)
 MindbenderDisc.buff_duration = 12
@@ -1156,22 +1155,17 @@ PurgeTheWicked.tick_interval = 2
 PurgeTheWicked.hasted_ticks = true
 PurgeTheWicked.equilibrium = 'holy'
 PurgeTheWicked:AutoAoe(false, 'apply')
-local PowerWordSolace = Ability:Add(129250, false, true)
-local Schism = Ability:Add(214621, false, true)
+local Schism = Ability:Add(424509, false, true, 214621)
 Schism.buff_duration = 9
-Schism.cooldown_duration = 24
-Schism.mana_cost = 0.5
-Schism.equilibrium = 'shadow'
 local ShadowCovenant = Ability:Add(314867, true, true, 322105)
-ShadowCovenant.mana_cost = 3.5
-ShadowCovenant.buff_duration = 7
-ShadowCovenant.cooldown_duration = 30
+ShadowCovenant.buff_duration = 12
 local TrainOfThought = Ability:Add(390693, false, true)
 local TwilightEquilibrium = Ability:Add(390705, true, true)
 TwilightEquilibrium.Holy = Ability:Add(390706, true, true)
 TwilightEquilibrium.Holy.buff_duration = 6
 TwilightEquilibrium.Shadow = Ability:Add(390707, true, true)
 TwilightEquilibrium.Shadow.buff_duration = 6
+local VoidSummoner = Ability:Add(390770, true, true)
 ------ Procs
 ---- Holy
 local HolyFire = Ability:Add(14914, false, true)
@@ -1957,6 +1951,13 @@ function ShadowWordPain:Remains()
 end
 PurgeTheWicked.Remains = ShadowWordPain.Remains
 
+function Schism:Remains()
+	if self.known and MindBlast:Casting() then
+		return self:Duration()
+	end
+	return Ability.Remains(self)
+end
+
 function Shadowfiend:Remains()
 	return Pet.Shadowfiend:Remains()
 end
@@ -1969,6 +1970,14 @@ function MindbenderDisc:Remains()
 	return Pet.Mindbender:Remains()
 end
 MindbenderShadow.Remains = MindbenderDisc.Remains
+
+function MindbenderDisc:Cooldown()
+	local remains = Ability.Cooldown(self)
+	if VoidSummoner.known and (Smite:Casting() or MindBlast:Casting()) then
+		remains = remains - 2
+	end
+	return max(0, remains)
+end
 
 function DevouringPlague:InsanityCost()
 	if MindDevourer.known and MindDevourer:Up() then
@@ -1987,17 +1996,25 @@ end
 
 function MindBlast:CastLanded(...)
 	if InescapableTorment.known then
-		Pet.Mindbender:ExtendAll(0.5 * InescapableTorment.rank)
+		Pet.Mindbender:ExtendAll(1.0)
 	end
 	Ability.CastLanded(self, ...)
 end
 
 function ShadowWordDeath:CastLanded(...)
 	if InescapableTorment.known then
-		Pet.Mindbender:ExtendAll(0.5 * InescapableTorment.rank)
+		Pet.Mindbender:ExtendAll(1.0)
 	end
 	Ability.CastLanded(self, ...)
 end
+
+function Penance:CastSuccess(...)
+	if InescapableTorment.known then
+		Pet.Mindbender:ExtendAll(1.0)
+	end
+	Ability.CastSuccess(self, ...)
+end
+DarkReprimand.CastSuccess = Penance.CastSuccess
 
 function TwilightEquilibrium.Holy:Remains()
 	if Player.cast.ability then
@@ -2095,13 +2112,11 @@ actions+=/use_items,if=cooldown.power_infusion.remains>35|buff.power_infusion.up
 actions+=/power_infusion
 actions+=/call_action_list,name=te_holy,if=talent.twilight_equilibrium.enabled&buff.twilight_equilibrium_holy.up
 actions+=/call_action_list,name=te_shadow,if=talent.twilight_equilibrium.enabled&buff.twilight_equilibrium_shadow.up
-actions+=/shadow_covenant,if=down
 actions+=/call_action_list,name=torment,if=talent.inescapable_torment.enabled&pet.fiend.active
 actions+=/penance
 actions+=/dark_reprimand
 actions+=/divine_star,if=spell_targets.divine_star>=3|talent.rhapsody.enabled&buff.rhapsody.stack>=18
 actions+=/halo,if=spell_targets.halo>=3
-actions+=/power_word_solace
 ]]
 	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
 		return ShadowWordDeath
@@ -2142,17 +2157,14 @@ actions+=/power_word_solace
 end
 
 APL[SPEC.DISCIPLINE].standard = function(self)
-	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
-		UseCooldown(ShadowCovenant)
-	end
 	if InescapableTorment.known and Player.fiend_up then
 		local apl = self:torment()
 		if apl then return apl end
 	end
-	if Penance:Usable() then
+	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
 		return Penance
 	end
-	if DarkReprimand:Usable() then
+	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
 		return DarkReprimand
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
@@ -2167,19 +2179,13 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Halo.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(Halo.Shadow)
 	end
-	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= 18 then
+	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= (20 - Player.enemies) then
 		UseCooldown(HolyNova)
 	end
-	if PowerWordSolace:Usable() then
-		return PowerWordSolace
-	end
-	if Player.swp:Usable() and Schism.known and Schism:Ready(2) and Player.swp:Remains() < 10 and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
+	if Player.swp:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and Player.swp:Remains() < 10 and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
 		return Player.swp
 	end
-	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
-		return Schism
-	end
-	if self.use_cds and Player.fiend:Usable() then
+	if self.use_cds and Player.fiend:Usable() and (not InescapableTorment.known or MindBlast:Ready(Player.gcd) or ShadowWordDeath:Ready(Player.gcd)) then
 		UseCooldown(Player.fiend)
 	end
 	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
@@ -2187,9 +2193,6 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	end
 	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or Target.timeToDie < (Player.fiend:Cooldown() / 2) or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
-	end
-	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
-		return MindBlast
 	end
 	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
@@ -2212,13 +2215,10 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 	if Player.swp:Usable() and Player.swp:Refreshable() and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
 		return Player.swp
 	end
-	if PowerWordSolace:Usable() then
-		return PowerWordSolace
-	end
-	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
+	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(12 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and (Player.enemies >= 3 or (Rhapsody.known and Rhapsody:Stack() >= 18)) then
+	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Stack() >= (20 - Player.enemies))) then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
@@ -2233,19 +2233,16 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 end
 
 APL[SPEC.DISCIPLINE].te_holy = function(self)
-	if Penance:Usable() then
+	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
 		return Penance
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
 	end
-	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= 18 then
+	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= (20 - Player.enemies) then
 		UseCooldown(HolyNova)
 	end
-	if PowerWordSolace:Usable() then
-		return PowerWordSolace
-	end
-	if PurgeTheWicked:Usable() and Schism.known and Schism:Ready(Player.gcd * 2) and PurgeTheWicked:Remains() < 10 and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
+	if PurgeTheWicked:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and PurgeTheWicked:Remains() < 10 and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
 		return PurgeTheWicked
 	end
 	if DivineStar:Usable() then
@@ -2257,7 +2254,7 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if PurgeTheWicked:Usable() and PurgeTheWicked:Refreshable() and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
 		return PurgeTheWicked
 	end
-	if HolyNova:Usable() and (Player.enemies >= 3 or (Rhapsody.known and Rhapsody:Stack() >= 18)) then
+	if HolyNova:Usable() and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Stack() >= (20 - Player.enemies))) then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
@@ -2266,14 +2263,11 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 end
 
 APL[SPEC.DISCIPLINE].te_shadow = function(self)
-	if ShadowCovenant:Usable() and ShadowCovenant:Down() then
-		UseCooldown(ShadowCovenant)
-	end
 	if InescapableTorment.known and Player.fiend_up then
 		local apl = self:torment()
 		if apl then return apl end
 	end
-	if DarkReprimand:Usable() then
+	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
 		return DarkReprimand
 	end
 	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
@@ -2282,20 +2276,14 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if Halo.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(Halo.Shadow)
 	end
-	if ShadowWordPain:Usable() and Schism.known and Schism:Ready(2) and ShadowWordPain:Remains() < 10 and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
+	if ShadowWordPain:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and ShadowWordPain:Remains() < 10 and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
 		return ShadowWordPain
 	end
-	if Schism:Usable() and (Target.boss or Target.timeToDie > 4) then
-		return Schism
-	end
-	if self.use_cds and Player.fiend:Usable() then
+	if self.use_cds and Player.fiend:Usable() and (not InescapableTorment.known or MindBlast:Ready(Player.gcd) or ShadowWordDeath:Ready(Player.gcd)) then
 		UseCooldown(Player.fiend)
 	end
 	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or Target.timeToDie < (Player.fiend:Cooldown() / 2) or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
-	end
-	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 then
-		return MindBlast
 	end
 	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
@@ -2309,7 +2297,7 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if ShadowWordPain:Usable() and ShadowWordPain:Refreshable() and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
 		return ShadowWordPain
 	end
-	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(8 * Player.haste_factor)) then
+	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(12 * Player.haste_factor)) then
 		return MindBlast
 	end
 end
@@ -2323,17 +2311,11 @@ actions.torment+=/mind_blast,if=charges_fractional>1.5&pet.fiend.remains>=execut
 actions.torment+=/shadow_word_death,target_if=min:target.time_to_die,if=target.time_to_pct_20>(pet.fiend.remains-gcd)
 actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 ]]
-	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.8 and Player.fiend_remains >= MindBlast:CastTime() then
+	if Schism.known and MindBlast:Usable() and Player.fiend_remains >= MindBlast:CastTime() then
 		return MindBlast
-	end
-	if Schism:Usable() and Player.fiend_remains > (3 * Player.gcd) then
-		return Schism
 	end
 	if ShadowWordDeath:Usable() and Target.health.pct < 20 then
 		return ShadowWordDeath
-	end
-	if MindBlast:Usable() and MindBlast:ChargesFractional() > 1.5 and Player.fiend_remains >= MindBlast:CastTime() then
-		return MindBlast
 	end
 	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > (Player.fiend_remains - Player.gcd) then
 		return ShadowWordDeath
