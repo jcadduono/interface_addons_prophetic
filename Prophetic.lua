@@ -1276,7 +1276,8 @@ DarkThought.buff_duration = 10
 -- PvP talents
 
 -- Trinket Effects
-
+local SolarMaelstrom = Ability:Add(422146, false, true) -- Belor'relos
+SolarMaelstrom:AutoAoe()
 -- Class cooldowns
 
 -- End Abilities
@@ -1436,6 +1437,9 @@ function InventoryItem:Count()
 end
 
 function InventoryItem:Cooldown()
+	if self.cast_spell and self.cast_spell:Casting() then
+		return self.cooldown_duration
+	end
 	local startTime, duration
 	if self.equip_slot then
 		startTime, duration = GetInventoryItemCooldown('player', self.equip_slot)
@@ -1464,7 +1468,9 @@ function InventoryItem:Usable(seconds)
 end
 
 -- Inventory Items
-
+Trinket.BelorrelosTheSuncaller = InventoryItem:Add(207172)
+Trinket.BelorrelosTheSuncaller.cast_spell = SolarMaelstrom
+Trinket.BelorrelosTheSuncaller.cooldown_duration = 120
 -- Equipment
 local Trinket1 = InventoryItem:Add(0)
 local Trinket2 = InventoryItem:Add(0)
@@ -1644,6 +1650,7 @@ function Player:UpdateKnown()
 	MindSear.damage.known = MindSear.known
 	Voidform.known = VoidEruption.known
 	VoidBolt.known = VoidEruption.known
+	SolarMaelstrom.known = Trinket.BelorrelosTheSuncaller:Equipped()
 
 	Abilities:Update()
 	SummonedPets:Update()
@@ -2129,11 +2136,16 @@ actions+=/halo,if=spell_targets.halo>=3
 		return Player.swp
 	end
 	if self.use_cds then
-		if Opt.trinket and (not PowerInfusion:Ready(35) or PowerInfusion:Up() or (Target.boss and Target.timeToDie < 25)) then
-			if Trinket1:Usable() then
-				UseCooldown(Trinket1)
-			elseif Trinket2:Usable() then
-				UseCooldown(Trinket2)
+		if Opt.trinket then
+			if Trinket.BelorrelosTheSuncaller:Usable() and Player.fiend_remains == 0 then
+				UseCooldown(Trinket.BelorrelosTheSuncaller)
+			end
+			if Opt.trinket and (not PowerInfusion:Ready(35) or PowerInfusion:Up() or (Target.boss and Target.timeToDie < 25)) then
+				if Trinket1:Usable() then
+					UseCooldown(Trinket1)
+				elseif Trinket2:Usable() then
+					UseCooldown(Trinket2)
+				end
 			end
 		end
 		if PowerInfusion:Usable() then
@@ -2161,10 +2173,10 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 		local apl = self:torment()
 		if apl then return apl end
 	end
-	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
+	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
 		return Penance
 	end
-	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
+	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
 		return DarkReprimand
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
@@ -2221,6 +2233,9 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Stack() >= (20 - Player.enemies))) then
 		UseCooldown(HolyNova)
 	end
+	if Penance:Usable() and not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor) then
+		return Penance
+	end
 	if Smite:Usable() then
 		return Smite
 	end
@@ -2233,7 +2248,7 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 end
 
 APL[SPEC.DISCIPLINE].te_holy = function(self)
-	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
+	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
 		return Penance
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
@@ -2267,7 +2282,7 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 		local apl = self:torment()
 		if apl then return apl end
 	end
-	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(6 * Player.haste_factor)) then
+	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
 		return DarkReprimand
 	end
 	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
@@ -2311,17 +2326,26 @@ actions.torment+=/mind_blast,if=charges_fractional>1.5&pet.fiend.remains>=execut
 actions.torment+=/shadow_word_death,target_if=min:target.time_to_die,if=target.time_to_pct_20>(pet.fiend.remains-gcd)
 actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 ]]
-	if Schism.known and MindBlast:Usable() and Player.fiend_remains >= MindBlast:CastTime() then
-		return MindBlast
-	end
-	if ShadowWordDeath:Usable() and Target.health.pct < 20 then
+	if ShadowWordDeath:Usable() and Player.fiend_remains < (Player.gcd * 2) then
 		return ShadowWordDeath
 	end
-	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > (Player.fiend_remains - Player.gcd) then
+	if Schism.known and MindBlast:Usable() and Schism:Down() and Player.fiend_remains > MindBlast:CastTime()  then
+		return MindBlast
+	end
+	if ShadowWordDeath:Usable() and (
+		Target.health.pct < 20 or
+		Target:TimeToPct(20) > (Player.fiend_remains - Player.gcd)
+	) then
 		return ShadowWordDeath
 	end
-	if MindBlast:Usable() and Player.fiend_remains >= MindBlast:CastTime() then
+	if MindBlast:Usable() and Player.fiend_remains > MindBlast:CastTime() then
 		return MindBlast
+	end
+	if DarkReprimand:Usable() then
+		return DarkReprimand
+	end
+	if Penance:Usable() then
+		return Penance
 	end
 end
 
