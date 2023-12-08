@@ -2101,7 +2101,7 @@ actions.precombat+=/snapshot_stats
 		(PowerInfusion.known and PowerInfusion:Remains() > 10) or
 		(Player.fiend_remains > 5)
 	)
-	self.use_cds = Target.boss or Target.timeToDie > Opt.cd_ttd or PowerInfusion:Up() or Player.fiend_up
+	self.hold_penance = self.use_cds and InescapableTorment.known and not Player.fiend_up and Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)
 	if Player.health.pct < 35 and PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
@@ -2173,10 +2173,10 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 		local apl = self:torment()
 		if apl then return apl end
 	end
-	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
+	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
-	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
+	if DarkReprimand:Usable() and not self.hold_penance then
 		return DarkReprimand
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
@@ -2233,7 +2233,7 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Stack() >= (20 - Player.enemies))) then
 		UseCooldown(HolyNova)
 	end
-	if Penance:Usable() and not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor) then
+	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
 	if Smite:Usable() then
@@ -2248,7 +2248,7 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 end
 
 APL[SPEC.DISCIPLINE].te_holy = function(self)
-	if Penance:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
+	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
@@ -2282,7 +2282,7 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 		local apl = self:torment()
 		if apl then return apl end
 	end
-	if DarkReprimand:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) then
+	if DarkReprimand:Usable() and not self.hold_penance then
 		return DarkReprimand
 	end
 	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
