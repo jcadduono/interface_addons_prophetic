@@ -1093,6 +1093,10 @@ Halo.Shadow.mana_cost = 2.7
 Halo.Shadow.cooldown_duration = 40
 Halo.Shadow.equilibrium = 'shadow'
 Halo.Shadow:AutoAoe()
+local Mindgames = Ability:Add(375901, false, true)
+Mindgames.buff_duration = 5
+Mindgames.cooldown_duration = 45
+Mindgames.equilibrium = 'shadow'
 local PowerWordLife = Ability:Add(373481, true, true)
 PowerWordLife.mana_cost = 0.5
 PowerWordLife.cooldown_duration = 30
@@ -1914,10 +1918,7 @@ DivineStar.Usable = Penance.Usable
 Halo.Usable = Penance.Usable
 
 function DarkReprimand:Usable()
-	if ShadowCovenant.known and ShadowCovenant:Down() then
-		return false
-	end
-	return Ability.Usable(self)
+	return ShadowCovenant.known and Ability.Usable(self) and ShadowCovenant:Up() and ShadowCovenant:Remains() >= self:CastTime()
 end
 DivineStar.Shadow.Usable = DarkReprimand.Usable
 Halo.Shadow.Usable = DarkReprimand.Usable
@@ -2209,6 +2210,9 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
 	end
+	if Mindgames:Usable() and Target.timeToDie > 6 and (not ShadowCovenant.known or not Player.fiend:Ready(Player.gcd * 4)) then
+		UseCooldown(Mindgames)
+	end
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
 	end
@@ -2314,6 +2318,9 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	end
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(12 * Player.haste_factor)) then
 		return MindBlast
+	end
+	if Mindgames:Usable() and Target.timeToDie > 6 and (not Player.fiend_up or not (DarkReprimand:Ready(Player.gcd * 2) or ShadowWordDeath:Ready(Player.gcd * 2) or MindBlast:Ready(Player.gcd * 2))) then
+		UseCooldown(Mindgames)
 	end
 end
 
