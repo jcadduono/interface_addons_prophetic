@@ -1,9 +1,23 @@
 local ADDON = 'Prophetic'
+local ADDON_PATH = 'Interface\\AddOns\\' .. ADDON .. '\\'
+
+BINDING_CATEGORY_PROPHETIC = ADDON
+BINDING_NAME_PROPHETIC_TARGETMORE = "Toggle Targets +"
+BINDING_NAME_PROPHETIC_TARGETLESS = "Toggle Targets -"
+BINDING_NAME_PROPHETIC_TARGET1 = "Set Targets to 1"
+BINDING_NAME_PROPHETIC_TARGET2 = "Set Targets to 2"
+BINDING_NAME_PROPHETIC_TARGET3 = "Set Targets to 3"
+BINDING_NAME_PROPHETIC_TARGET4 = "Set Targets to 4"
+BINDING_NAME_PROPHETIC_TARGET5 = "Set Targets to 5+"
+
+local function log(...)
+	print(ADDON, '-', ...)
+end
+
 if select(2, UnitClass('player')) ~= 'PRIEST' then
-	DisableAddOn(ADDON)
+	log('[|cFFFF0000Error|r]', 'Not loading because you are not the correct class! Consider disabling', ADDON, 'for this character.')
 	return
 end
-local ADDON_PATH = 'Interface\\AddOns\\' .. ADDON .. '\\'
 
 -- reference heavily accessed global functions from local scope for performance
 local min = math.min
@@ -48,7 +62,6 @@ Prophetic = {}
 local Opt -- use this as a local table reference to Prophetic
 
 SLASH_Prophetic1, SLASH_Prophetic2 = '/pro', '/prophetic'
-BINDING_HEADER_PROPHETIC = ADDON
 
 local function InitOpts()
 	local function SetDefaults(t, ref)
@@ -109,8 +122,8 @@ local function InitOpts()
 		cd_ttd = 10,
 		pot = false,
 		trinket = true,
+		heal = 60,
 		fiend = true,
-		pws_threshold = 60,
 	})
 end
 
@@ -242,6 +255,7 @@ local Player = {
 	set_bonus = {
 		t29 = 0, -- Draconic Hierophant's Finery
 		t30 = 0, -- The Furnace Seraph's Verdict
+		t31 = 0, -- Blessings of Lunar Communion
 	},
 	previous_gcd = {},-- list of previous GCD abilities
 	item_use_blacklist = { -- list of item IDs with on-use effects we should mark unusable
@@ -290,135 +304,6 @@ local BaseMana = {
 	58730,	68985,	81030,	95180,	111800,	-- 65
 	131325,	154255,	181190,	212830,	250000,	-- 70
 }
-
-local propheticPanel = CreateFrame('Frame', 'propheticPanel', UIParent)
-propheticPanel:SetPoint('CENTER', 0, -169)
-propheticPanel:SetFrameStrata('BACKGROUND')
-propheticPanel:SetSize(64, 64)
-propheticPanel:SetMovable(true)
-propheticPanel:SetUserPlaced(true)
-propheticPanel:RegisterForDrag('LeftButton')
-propheticPanel:SetScript('OnDragStart', propheticPanel.StartMoving)
-propheticPanel:SetScript('OnDragStop', propheticPanel.StopMovingOrSizing)
-propheticPanel:Hide()
-propheticPanel.icon = propheticPanel:CreateTexture(nil, 'BACKGROUND')
-propheticPanel.icon:SetAllPoints(propheticPanel)
-propheticPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-propheticPanel.border = propheticPanel:CreateTexture(nil, 'ARTWORK')
-propheticPanel.border:SetAllPoints(propheticPanel)
-propheticPanel.border:SetTexture(ADDON_PATH .. 'border.blp')
-propheticPanel.border:Hide()
-propheticPanel.dimmer = propheticPanel:CreateTexture(nil, 'BORDER')
-propheticPanel.dimmer:SetAllPoints(propheticPanel)
-propheticPanel.dimmer:SetColorTexture(0, 0, 0, 0.6)
-propheticPanel.dimmer:Hide()
-propheticPanel.swipe = CreateFrame('Cooldown', nil, propheticPanel, 'CooldownFrameTemplate')
-propheticPanel.swipe:SetAllPoints(propheticPanel)
-propheticPanel.swipe:SetDrawBling(false)
-propheticPanel.swipe:SetDrawEdge(false)
-propheticPanel.text = CreateFrame('Frame', nil, propheticPanel)
-propheticPanel.text:SetAllPoints(propheticPanel)
-propheticPanel.text.tl = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.tl:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
-propheticPanel.text.tl:SetPoint('TOPLEFT', propheticPanel, 'TOPLEFT', 2.5, -3)
-propheticPanel.text.tl:SetJustifyH('LEFT')
-propheticPanel.text.tr = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.tr:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
-propheticPanel.text.tr:SetPoint('TOPRIGHT', propheticPanel, 'TOPRIGHT', -2.5, -3)
-propheticPanel.text.tr:SetJustifyH('RIGHT')
-propheticPanel.text.bl = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.bl:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
-propheticPanel.text.bl:SetPoint('BOTTOMLEFT', propheticPanel, 'BOTTOMLEFT', 2.5, 3)
-propheticPanel.text.bl:SetJustifyH('LEFT')
-propheticPanel.text.br = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.br:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
-propheticPanel.text.br:SetPoint('BOTTOMRIGHT', propheticPanel, 'BOTTOMRIGHT', -2.5, 3)
-propheticPanel.text.br:SetJustifyH('RIGHT')
-propheticPanel.text.center = propheticPanel.text:CreateFontString(nil, 'OVERLAY')
-propheticPanel.text.center:SetFont('Fonts\\FRIZQT__.TTF', 10, 'OUTLINE')
-propheticPanel.text.center:SetAllPoints(propheticPanel.text)
-propheticPanel.text.center:SetJustifyH('CENTER')
-propheticPanel.text.center:SetJustifyV('CENTER')
-propheticPanel.button = CreateFrame('Button', nil, propheticPanel)
-propheticPanel.button:SetAllPoints(propheticPanel)
-propheticPanel.button:RegisterForClicks('LeftButtonDown', 'RightButtonDown', 'MiddleButtonDown')
-local propheticPreviousPanel = CreateFrame('Frame', 'propheticPreviousPanel', UIParent)
-propheticPreviousPanel:SetFrameStrata('BACKGROUND')
-propheticPreviousPanel:SetSize(64, 64)
-propheticPreviousPanel:SetMovable(true)
-propheticPreviousPanel:SetUserPlaced(true)
-propheticPreviousPanel:RegisterForDrag('LeftButton')
-propheticPreviousPanel:SetScript('OnDragStart', propheticPreviousPanel.StartMoving)
-propheticPreviousPanel:SetScript('OnDragStop', propheticPreviousPanel.StopMovingOrSizing)
-propheticPreviousPanel:Hide()
-propheticPreviousPanel.icon = propheticPreviousPanel:CreateTexture(nil, 'BACKGROUND')
-propheticPreviousPanel.icon:SetAllPoints(propheticPreviousPanel)
-propheticPreviousPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-propheticPreviousPanel.border = propheticPreviousPanel:CreateTexture(nil, 'ARTWORK')
-propheticPreviousPanel.border:SetAllPoints(propheticPreviousPanel)
-propheticPreviousPanel.border:SetTexture(ADDON_PATH .. 'border.blp')
-local propheticCooldownPanel = CreateFrame('Frame', 'propheticCooldownPanel', UIParent)
-propheticCooldownPanel:SetFrameStrata('BACKGROUND')
-propheticCooldownPanel:SetSize(64, 64)
-propheticCooldownPanel:SetMovable(true)
-propheticCooldownPanel:SetUserPlaced(true)
-propheticCooldownPanel:RegisterForDrag('LeftButton')
-propheticCooldownPanel:SetScript('OnDragStart', propheticCooldownPanel.StartMoving)
-propheticCooldownPanel:SetScript('OnDragStop', propheticCooldownPanel.StopMovingOrSizing)
-propheticCooldownPanel:Hide()
-propheticCooldownPanel.icon = propheticCooldownPanel:CreateTexture(nil, 'BACKGROUND')
-propheticCooldownPanel.icon:SetAllPoints(propheticCooldownPanel)
-propheticCooldownPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-propheticCooldownPanel.border = propheticCooldownPanel:CreateTexture(nil, 'ARTWORK')
-propheticCooldownPanel.border:SetAllPoints(propheticCooldownPanel)
-propheticCooldownPanel.border:SetTexture(ADDON_PATH .. 'border.blp')
-propheticCooldownPanel.dimmer = propheticCooldownPanel:CreateTexture(nil, 'BORDER')
-propheticCooldownPanel.dimmer:SetAllPoints(propheticCooldownPanel)
-propheticCooldownPanel.dimmer:SetColorTexture(0, 0, 0, 0.6)
-propheticCooldownPanel.dimmer:Hide()
-propheticCooldownPanel.swipe = CreateFrame('Cooldown', nil, propheticCooldownPanel, 'CooldownFrameTemplate')
-propheticCooldownPanel.swipe:SetAllPoints(propheticCooldownPanel)
-propheticCooldownPanel.swipe:SetDrawBling(false)
-propheticCooldownPanel.swipe:SetDrawEdge(false)
-propheticCooldownPanel.text = propheticCooldownPanel:CreateFontString(nil, 'OVERLAY')
-propheticCooldownPanel.text:SetFont('Fonts\\FRIZQT__.TTF', 12, 'OUTLINE')
-propheticCooldownPanel.text:SetAllPoints(propheticCooldownPanel)
-propheticCooldownPanel.text:SetJustifyH('CENTER')
-propheticCooldownPanel.text:SetJustifyV('CENTER')
-local propheticInterruptPanel = CreateFrame('Frame', 'propheticInterruptPanel', UIParent)
-propheticInterruptPanel:SetFrameStrata('BACKGROUND')
-propheticInterruptPanel:SetSize(64, 64)
-propheticInterruptPanel:SetMovable(true)
-propheticInterruptPanel:SetUserPlaced(true)
-propheticInterruptPanel:RegisterForDrag('LeftButton')
-propheticInterruptPanel:SetScript('OnDragStart', propheticInterruptPanel.StartMoving)
-propheticInterruptPanel:SetScript('OnDragStop', propheticInterruptPanel.StopMovingOrSizing)
-propheticInterruptPanel:Hide()
-propheticInterruptPanel.icon = propheticInterruptPanel:CreateTexture(nil, 'BACKGROUND')
-propheticInterruptPanel.icon:SetAllPoints(propheticInterruptPanel)
-propheticInterruptPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-propheticInterruptPanel.border = propheticInterruptPanel:CreateTexture(nil, 'ARTWORK')
-propheticInterruptPanel.border:SetAllPoints(propheticInterruptPanel)
-propheticInterruptPanel.border:SetTexture(ADDON_PATH .. 'border.blp')
-propheticInterruptPanel.swipe = CreateFrame('Cooldown', nil, propheticInterruptPanel, 'CooldownFrameTemplate')
-propheticInterruptPanel.swipe:SetAllPoints(propheticInterruptPanel)
-propheticInterruptPanel.swipe:SetDrawBling(false)
-propheticInterruptPanel.swipe:SetDrawEdge(false)
-local propheticExtraPanel = CreateFrame('Frame', 'propheticExtraPanel', UIParent)
-propheticExtraPanel:SetFrameStrata('BACKGROUND')
-propheticExtraPanel:SetSize(64, 64)
-propheticExtraPanel:SetMovable(true)
-propheticExtraPanel:SetUserPlaced(true)
-propheticExtraPanel:RegisterForDrag('LeftButton')
-propheticExtraPanel:SetScript('OnDragStart', propheticExtraPanel.StartMoving)
-propheticExtraPanel:SetScript('OnDragStop', propheticExtraPanel.StopMovingOrSizing)
-propheticExtraPanel:Hide()
-propheticExtraPanel.icon = propheticExtraPanel:CreateTexture(nil, 'BACKGROUND')
-propheticExtraPanel.icon:SetAllPoints(propheticExtraPanel)
-propheticExtraPanel.icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-propheticExtraPanel.border = propheticExtraPanel:CreateTexture(nil, 'ARTWORK')
-propheticExtraPanel.border:SetAllPoints(propheticExtraPanel)
-propheticExtraPanel.border:SetTexture(ADDON_PATH .. 'border.blp')
 
 -- Start AoE
 
@@ -616,10 +501,10 @@ function Ability:Usable(seconds, pool)
 	if not self.known then
 		return false
 	end
-	if self.mana_cost > 0 and self:ManaCost() > Player.mana.current then
+	if self:ManaCost() > Player.mana.current then
 		return false
 	end
-	if Player.spec == SPEC.SHADOW and self.insanity_cost > 0 and self:InsanityCost() > Player.insanity.current then
+	if Player.spec == SPEC.SHADOW and self:InsanityCost() > Player.insanity.current then
 		return false
 	end
 	if self.requires_charge and self:Charges() == 0 then
@@ -628,7 +513,7 @@ function Ability:Usable(seconds, pool)
 	return self:Ready(seconds)
 end
 
-function Ability:Remains(offGCD)
+function Ability:Remains()
 	if self:Casting() or self:Traveling() > 0 then
 		return self:Duration()
 	end
@@ -641,7 +526,7 @@ function Ability:Remains(offGCD)
 			if expires == 0 then
 				return 600 -- infinite duration
 			end
-			return max(0, expires - Player.ctime - (offGCD and 0 or Player.execute_remains))
+			return max(0, expires - Player.ctime - (self.off_gcd and 0 or Player.execute_remains))
 		end
 	end
 	return 0
@@ -900,6 +785,9 @@ end
 
 function Ability:CastSuccess(dstGUID)
 	self.last_used = Player.time
+	if self.ignore_cast then
+		return
+	end
 	Player.last_ability = self
 	if self.triggers_gcd then
 		Player.previous_gcd[10] = nil
@@ -947,6 +835,13 @@ function Ability:CastLanded(dstGUID, event, missType)
 		self.range_est_start = nil
 	elseif self.max_range < Target.estimated_range then
 		Target.estimated_range = self.max_range
+	end
+	if Opt.auto_aoe and self.auto_aoe then
+		if event == 'SPELL_MISSED' and (missType == 'EVADE' or (missType == 'IMMUNE' and not self.ignore_immune)) then
+			AutoAoe:Remove(dstGUID)
+		elseif event == self.auto_aoe.trigger or (self.auto_aoe.trigger == 'SPELL_AURA_APPLIED' and event == 'SPELL_AURA_REFRESH') then
+			self:RecordTargetHit(dstGUID)
+		end
 	end
 	if Opt.previous and Opt.miss_effect and event == 'SPELL_MISSED' and propheticPreviousPanel.ability == self then
 		propheticPreviousPanel.border:SetTexture(ADDON_PATH .. 'misseffect.blp')
@@ -1418,6 +1313,7 @@ function InventoryItem:Add(itemId)
 		name = name,
 		icon = icon,
 		can_use = false,
+		off_gcd = true,
 	}
 	setmetatable(item, self)
 	inventoryItems[#inventoryItems + 1] = item
@@ -1441,16 +1337,16 @@ function InventoryItem:Count()
 end
 
 function InventoryItem:Cooldown()
-	if self.cast_spell and self.cast_spell:Casting() then
-		return self.cooldown_duration
-	end
-	local startTime, duration
+	local start, duration
 	if self.equip_slot then
-		startTime, duration = GetInventoryItemCooldown('player', self.equip_slot)
+		start, duration = GetInventoryItemCooldown('player', self.equip_slot)
 	else
-		startTime, duration = GetItemCooldown(self.itemId)
+		start, duration = GetItemCooldown(self.itemId)
 	end
-	return startTime == 0 and 0 or duration - (Player.ctime - startTime)
+	if start == 0 then
+		return 0
+	end
+	return max(0, duration - (Player.ctime - start) - (self.off_gcd and 0 or Player.execute_remains))
 end
 
 function InventoryItem:Ready(seconds)
@@ -1475,6 +1371,7 @@ end
 Trinket.BelorrelosTheSuncaller = InventoryItem:Add(207172)
 Trinket.BelorrelosTheSuncaller.cast_spell = SolarMaelstrom
 Trinket.BelorrelosTheSuncaller.cooldown_duration = 120
+Trinket.BelorrelosTheSuncaller.off_gcd = false
 -- Equipment
 local Trinket1 = InventoryItem:Add(0)
 local Trinket2 = InventoryItem:Add(0)
@@ -1765,7 +1662,7 @@ function Player:Update()
 				self.insanity.current = self.insanity.current + self.cast.ability:InsanityGain()
 			end
 		end
-		self.insanity.current = min(self.insanity.max, max(0, self.insanity.current))
+		self.insanity.current = clamp(self.insanity.current, 0, self.insanity.max)
 	end
 	speed, max_speed = GetUnitSpeed('player')
 	self.moving = speed ~= 0
@@ -1868,21 +1765,21 @@ function Target:Update()
 	self.stunnable = true
 	self.classification = UnitClassification('target')
 	self.player = UnitIsPlayer('target')
-	self.level = UnitLevel('target')
 	self.hostile = UnitCanAttack('player', 'target') and not UnitIsDead('target')
+	self.level = UnitLevel('target')
+	if self.level == -1 then
+		self.level = Player.level + 3
+	end
 	if not self.player and self.classification ~= 'minus' and self.classification ~= 'normal' then
-		if self.level == -1 or (Player.instance == 'party' and self.level >= Player.level + 2) then
-			self.boss = true
-			self.stunnable = false
-		elseif Player.instance == 'raid' or (self.health.max > Player.health.max * 10) then
-			self.stunnable = false
-		end
+		self.boss = self.level >= (Player.level + 3)
+		self.stunnable = self.level < (Player.level + 2)
 	end
 	if self.hostile or Opt.always_on then
 		UI:UpdateCombat()
 		propheticPanel:Show()
 		return true
 	end
+	UI:Disappear()
 end
 
 function Target:TimeToPct(pct)
@@ -2107,9 +2004,9 @@ actions.precombat+=/snapshot_stats
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.heal or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
-	elseif self.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
+	elseif self.use_cds and Player.health.pct < Opt.heal and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
 --[[
@@ -2370,9 +2267,9 @@ APL[SPEC.HOLY].Main = function(self)
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.heal or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
-	elseif self.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
+	elseif self.use_cds and Player.health.pct < Opt.heal and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
 end
@@ -2411,9 +2308,9 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player.health.pct < Opt.pws_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.heal or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
-	elseif self.use_cds and Player.health.pct < Opt.pws_threshold and VampiricEmbrace:Usable() then
+	elseif self.use_cds and Player.health.pct < Opt.heal and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
 --[[
@@ -2738,7 +2635,7 @@ function UI:CreateOverlayGlows()
 			end
 		end
 	end
-	UI:UpdateGlowColorAndScale()
+	self:UpdateGlowColorAndScale()
 end
 
 function UI:UpdateGlows()
@@ -2774,6 +2671,18 @@ end
 
 function UI:UpdateDraggable()
 	local draggable = not (Opt.locked or Opt.snap or Opt.aoe)
+	propheticPanel:SetMovable(not Opt.snap)
+	propheticPreviousPanel:SetMovable(not Opt.snap)
+	propheticCooldownPanel:SetMovable(not Opt.snap)
+	propheticInterruptPanel:SetMovable(not Opt.snap)
+	propheticExtraPanel:SetMovable(not Opt.snap)
+	if not Opt.snap then
+		propheticPanel:SetUserPlaced(true)
+		propheticPreviousPanel:SetUserPlaced(true)
+		propheticCooldownPanel:SetUserPlaced(true)
+		propheticInterruptPanel:SetUserPlaced(true)
+		propheticExtraPanel:SetUserPlaced(true)
+	end
 	propheticPanel:EnableMouse(draggable or Opt.aoe)
 	propheticPanel.button:SetShown(Opt.aoe)
 	propheticPreviousPanel:EnableMouse(draggable)
@@ -2890,6 +2799,12 @@ function UI:Disappear()
 	Player.interrupt = nil
 	Player.extra = nil
 	UI:UpdateGlows()
+end
+
+function UI:Reset()
+	propheticPanel:ClearAllPoints()
+	propheticPanel:SetPoint('CENTER', 0, -169)
+	self:SnapAllPanels()
 end
 
 function UI:UpdateDisplay()
@@ -3057,12 +2972,12 @@ function Events:ADDON_LOADED(name)
 		UI:UpdateAlpha()
 		UI:UpdateScale()
 		if firstRun then
-			print('It looks like this is your first time running ' .. ADDON .. ', why don\'t you take some time to familiarize yourself with the commands?')
-			print('Type |cFFFFD000' .. SLASH_Prophetic1 .. '|r for a list of commands.')
+			log('It looks like this is your first time running ' .. ADDON .. ', why don\'t you take some time to familiarize yourself with the commands?')
+			log('Type |cFFFFD000' .. SLASH_Prophetic1 .. '|r for a list of commands.')
 			UI:SnapAllPanels()
 		end
 		if UnitLevel('player') < 10 then
-			print('[|cFFFFD000Warning|r] ' .. ADDON .. ' is not designed for players under level 10, and almost certainly will not operate properly!')
+			log('[|cFFFFD000Warning|r]', ADDON, 'is not designed for players under level 10, and almost certainly will not operate properly!')
 		end
 	end
 end
@@ -3082,6 +2997,7 @@ CombatEvent.TRIGGER = function(timeStamp, event, _, srcGUID, _, _, _, dstGUID, _
 	   e == 'SPELL_CAST_SUCCESS' or
 	   e == 'SPELL_CAST_FAILED' or
 	   e == 'SPELL_DAMAGE' or
+	   e == 'SPELL_ABSORBED' or
 	   e == 'SPELL_ENERGIZE' or
 	   e == 'SPELL_PERIODIC_DAMAGE' or
 	   e == 'SPELL_MISSED' or
@@ -3158,7 +3074,7 @@ CombatEvent.SPELL = function(event, srcGUID, dstGUID, spellId, spellName, spellS
 				elseif (event == 'SPELL_DAMAGE' or event == 'SPELL_ABSORBED' or event == 'SPELL_MISSED' or event == 'SPELL_AURA_APPLIED' or event == 'SPELL_AURA_REFRESH') and pet.CastLanded then
 					pet:CastLanded(unit, spellId, dstGUID, event, missType)
 				end
-				--print(format('PET %d EVENT %s SPELL %s ID %d', pet.unitId, event, type(spellName) == 'string' and spellName or 'Unknown', spellId or 0))
+				--log(format('PET %d EVENT %s SPELL %s ID %d', pet.unitId, event, type(spellName) == 'string' and spellName or 'Unknown', spellId or 0))
 			end
 		end
 		return
@@ -3166,7 +3082,7 @@ CombatEvent.SPELL = function(event, srcGUID, dstGUID, spellId, spellName, spellS
 
 	local ability = spellId and Abilities.bySpellId[spellId]
 	if not ability then
-		--print(format('EVENT %s TRACK CHECK FOR UNKNOWN %s ID %d', event, type(spellName) == 'string' and spellName or 'Unknown', spellId or 0))
+		--log(format('EVENT %s TRACK CHECK FOR UNKNOWN %s ID %d', event, type(spellName) == 'string' and spellName or 'Unknown', spellId or 0))
 		return
 	end
 
@@ -3194,13 +3110,6 @@ CombatEvent.SPELL = function(event, srcGUID, dstGUID, spellId, spellName, spellS
 			ability.last_gained = Player.time
 		end
 		return -- ignore buffs beyond here
-	end
-	if Opt.auto_aoe then
-		if event == 'SPELL_MISSED' and (missType == 'EVADE' or (missType == 'IMMUNE' and not ability.ignore_immune)) then
-			AutoAoe:Remove(dstGUID)
-		elseif ability.auto_aoe and (event == ability.auto_aoe.trigger or ability.auto_aoe.trigger == 'SPELL_AURA_APPLIED' and event == 'SPELL_AURA_REFRESH') then
-			ability:RecordTargetHit(dstGUID)
-		end
 	end
 	if event == 'SPELL_DAMAGE' or event == 'SPELL_ABSORBED' or event == 'SPELL_MISSED' or event == 'SPELL_AURA_APPLIED' or event == 'SPELL_AURA_REFRESH' then
 		ability:CastLanded(dstGUID, event, missType)
@@ -3328,6 +3237,7 @@ function Events:PLAYER_EQUIPMENT_CHANGED()
 
 	Player.set_bonus.t29 = (Player:Equipped(200324) and 1 or 0) + (Player:Equipped(200326) and 1 or 0) + (Player:Equipped(200327) and 1 or 0) + (Player:Equipped(200328) and 1 or 0) + (Player:Equipped(200329) and 1 or 0)
 	Player.set_bonus.t30 = (Player:Equipped(202540) and 1 or 0) + (Player:Equipped(202541) and 1 or 0) + (Player:Equipped(202542) and 1 or 0) + (Player:Equipped(202543) and 1 or 0) + (Player:Equipped(202545) and 1 or 0)
+	Player.set_bonus.t31 = (Player:Equipped(207279) and 1 or 0) + (Player:Equipped(207280) and 1 or 0) + (Player:Equipped(207281) and 1 or 0) + (Player:Equipped(207282) and 1 or 0) + (Player:Equipped(207284) and 1 or 0)
 
 	Player:UpdateKnown()
 end
@@ -3443,7 +3353,7 @@ local function Status(desc, opt, ...)
 	else
 		opt_view = opt and '|cFF00C000On|r' or '|cFFC00000Off|r'
 	end
-	print(ADDON, '-', desc .. ':', opt_view, ...)
+	log(desc .. ':', opt_view, ...)
 end
 
 SlashCmdList[ADDON] = function(msg, editbox)
@@ -3469,7 +3379,7 @@ SlashCmdList[ADDON] = function(msg, editbox)
 			else
 				Opt.snap = false
 				Opt.locked = false
-				propheticPanel:ClearAllPoints()
+				UI:Reset()
 			end
 			UI:UpdateDraggable()
 			UI.OnResourceFrameShow()
@@ -3696,22 +3606,20 @@ SlashCmdList[ADDON] = function(msg, editbox)
 		end
 		return Status('Show on-use trinkets in cooldown UI', Opt.trinket)
 	end
+	if startsWith(msg[1], 'he') then
+		if msg[2] then
+			Opt.heal_threshold = clamp(tonumber(msg[2]) or 60, 0, 100)
+		end
+		return Status('Health percentage threshold to recommend self healing spells', Opt.heal_threshold .. '%')
+	end
 	if startsWith(msg[1], 'fi') then
 		if msg[2] then
 			Opt.fiend = msg[2] == 'on'
 		end
 		return Status('Show Shadowfiend/Mindbender remaining time (top right)', Opt.fiend)
 	end
-	if msg[1] == 'pws' then
-		if msg[2] then
-			Opt.pws_threshold = clamp(tonumber(msg[2]) or 60, 0, 100)
-		end
-		return Status('Health percentage threshold to show Power Word: Shield reminder', Opt.pws_threshold .. '%')
-	end
 	if msg[1] == 'reset' then
-		propheticPanel:ClearAllPoints()
-		propheticPanel:SetPoint('CENTER', 0, -169)
-		UI:SnapAllPanels()
+		UI:Reset()
 		return Status('Position has been reset to', 'default')
 	end
 	print(ADDON, '(version: |cFFFFD000' .. GetAddOnMetadata(ADDON, 'Version') .. '|r) - Commands:')
@@ -3738,8 +3646,8 @@ SlashCmdList[ADDON] = function(msg, editbox)
 		'ttd |cFFFFD000[seconds]|r  - minimum enemy lifetime to use cooldowns on (default is 8 seconds, ignored on bosses)',
 		'pot |cFF00C000on|r/|cFFC00000off|r - show flasks and battle potions in cooldown UI',
 		'trinket |cFF00C000on|r/|cFFC00000off|r - show on-use trinkets in cooldown UI',
+		'heal |cFFFFD000[percent]|r - health percentage threshold to recommend self healing spells (default is 60%, 0 to disable)',
 		'fiend |cFF00C000on|r/|cFFC00000off|r - show Shadowfiend/Mindbender remaining time (top right)',
-		'pws |cFFFFD000[percent]|r - health percentage threshold to recommend Power Word: Shield',
 		'|cFFFFD000reset|r - reset the location of the ' .. ADDON .. ' UI to default',
 	} do
 		print('  ' .. SLASH_Prophetic1 .. ' ' .. cmd)
