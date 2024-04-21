@@ -223,8 +223,7 @@ local Player = {
 	insanity = {
 		current = 0,
 		max = 100,
-		drain = 0,
-		generation = 0,
+		deficit = 100,
 	},
 	cast = {
 		start = 0,
@@ -882,7 +881,7 @@ function Ability:ApplyAura(guid)
 	return aura
 end
 
-function Ability:RefreshAura(guid)
+function Ability:RefreshAura(guid, extend)
 	if AutoAoe.blacklist[guid] then
 		return
 	end
@@ -891,14 +890,14 @@ function Ability:RefreshAura(guid)
 		return self:ApplyAura(guid)
 	end
 	local duration = self:Duration()
-	aura.expires = max(aura.expires, Player.time + min(duration * (self.no_pandemic and 1.0 or 1.3), (aura.expires - Player.time) + duration))
+	aura.expires = max(aura.expires, Player.time + min(duration * (self.no_pandemic and 1.0 or 1.3), (aura.expires - Player.time) + (extend or duration)))
 	return aura
 end
 
-function Ability:RefreshAuraAll()
+function Ability:RefreshAuraAll(extend)
 	local duration = self:Duration()
 	for guid, aura in next, self.aura_targets do
-		aura.expires = max(aura.expires, Player.time + min(duration * (self.no_pandemic and 1.0 or 1.3), (aura.expires - Player.time) + duration))
+		aura.expires = max(aura.expires, Player.time + min(duration * (self.no_pandemic and 1.0 or 1.3), (aura.expires - Player.time) + (extend or duration)))
 	end
 end
 
@@ -920,36 +919,31 @@ Note: To get talent_node value for a talent, hover over talent and use macro:
 local DesperatePrayer = Ability:Add(19236, true, true)
 DesperatePrayer.buff_duration = 10
 DesperatePrayer.cooldown_duration = 90
-local DispelMagic = Ability:Add(528, false, true)
-DispelMagic.mana_cost = 1.6
 local Fade = Ability:Add(586, false, true)
 Fade.buff_duration = 10
 Fade.cooldown_duration = 30
-local HolyNova = Ability:Add(132157, false, true, 281265)
-HolyNova.mana_cost = 1.6
-HolyNova.equilibrium = 'holy'
-HolyNova:AutoAoe(true)
-local LeapOfFaith = Ability:Add(73325, true, true)
-LeapOfFaith.buff_duration = 1
-LeapOfFaith.mana_cost = 2.6
-LeapOfFaith.cooldown_duration = 90
 local Levitate = Ability:Add(1706, true, false, 111759)
 Levitate.mana_cost = 0.9
 Levitate.buff_duration = 600
 local Lightspawn = Ability:Add(254224, false, true)
 Lightspawn.cooldown_duration = 180
-local MassDispel = Ability:Add(32375, true, true)
-MassDispel.mana_cost = 8
-MassDispel.cooldown_duration = 45
-local MindControl = Ability:Add(605, false, true)
-MindControl.mana_cost = 2
-MindControl.buff_duration = 30
+local MindBlast = Ability:Add(8092, false, true)
+MindBlast.mana_cost = 0.25
+MindBlast.cooldown_duration = 7.5
+MindBlast.insanity_gain = 6
+MindBlast.hasted_cooldown = true
+MindBlast.requires_charge = true
+MindBlast.triggers_combat = true
+MindBlast.equilibrium = 'shadow'
 local PowerInfusion = Ability:Add(10060, true)
 PowerInfusion.buff_duration = 20
 PowerInfusion.cooldown_duration = 120
 local PowerWordFortitude = Ability:Add(21562, true, false)
 PowerWordFortitude.mana_cost = 4
 PowerWordFortitude.buff_duration = 3600
+local PowerWordShield = Ability:Add(17, true, true)
+PowerWordShield.mana_cost = 2.65
+PowerWordShield.buff_duration = 15
 local Purify = Ability:Add(527, true, true)
 Purify.mana_cost = 1.3
 Purify.cooldown_duration = 8
@@ -959,15 +953,19 @@ local ShadowWordPain = Ability:Add(589, false, true)
 ShadowWordPain.mana_cost = 0.3
 ShadowWordPain.buff_duration = 16
 ShadowWordPain.tick_interval = 2
-ShadowWordPain.hasted_ticks = true
 ShadowWordPain.insanity_gain = 4
+ShadowWordPain.hasted_ticks = true
+ShadowWordPain.triggers_combat = true
 ShadowWordPain.equilibrium = 'shadow'
 ShadowWordPain:AutoAoe(false, 'apply')
 ShadowWordPain:TrackAuras()
 local Smite = Ability:Add(585, false, true, 208772)
 Smite.mana_cost = 0.2
+Smite.triggers_combat = true
 Smite.equilibrium = 'holy'
 ------ Talents
+local DispelMagic = Ability:Add(528, false, true)
+DispelMagic.mana_cost = 1.6
 local DivineStar = Ability:Add(110744, false, true, 122128)
 DivineStar.mana_cost = 2
 DivineStar.cooldown_duration = 15
@@ -976,6 +974,8 @@ DivineStar:AutoAoe()
 DivineStar.Shadow = Ability:Add(122121, false, true, 390845)
 DivineStar.Shadow.mana_cost = 2
 DivineStar.Shadow.cooldown_duration = 15
+DivineStar.Shadow.insanity_gain = 6
+DivineStar.Shadow.triggers_combat = true
 DivineStar.Shadow.equilibrium = 'shadow'
 DivineStar.Shadow:AutoAoe()
 local Halo = Ability:Add(120517, false, true, 120696)
@@ -986,30 +986,54 @@ Halo:AutoAoe()
 Halo.Shadow = Ability:Add(120644, false, true, 390964)
 Halo.Shadow.mana_cost = 2.7
 Halo.Shadow.cooldown_duration = 40
+Halo.Shadow.insanity_gain = 10
+Halo.Shadow.triggers_combat = true
 Halo.Shadow.equilibrium = 'shadow'
 Halo.Shadow:AutoAoe()
+local HolyNova = Ability:Add(132157, false, true, 281265)
+HolyNova.mana_cost = 1.6
+HolyNova.equilibrium = 'holy'
+HolyNova:AutoAoe(true)
+local LeapOfFaith = Ability:Add(73325, true, true)
+LeapOfFaith.buff_duration = 1
+LeapOfFaith.mana_cost = 2.6
+LeapOfFaith.cooldown_duration = 90
+local MassDispel = Ability:Add(32375, true, true)
+MassDispel.mana_cost = 8
+MassDispel.cooldown_duration = 45
+local MindControl = Ability:Add(605, false, true)
+MindControl.mana_cost = 2
+MindControl.buff_duration = 30
+MindControl.triggers_combat = true
 local Mindgames = Ability:Add(375901, false, true)
 Mindgames.buff_duration = 5
 Mindgames.cooldown_duration = 45
+Mindgames.insanity_gain = 10
+Mindgames.triggers_combat = true
 Mindgames.equilibrium = 'shadow'
 local PowerWordLife = Ability:Add(373481, true, true)
 PowerWordLife.mana_cost = 0.5
 PowerWordLife.cooldown_duration = 30
+local Renew = Ability:Add(139, true, true)
+Renew.mana_cost = 1.8
+Renew.buff_duration = 15
+Renew.tick_interval = 3
+Renew.hasted_ticks = true
 local Rhapsody = Ability:Add(390622, true, true, 390636)
+local ShadowWordDeath = Ability:Add(32379, false, true)
+ShadowWordDeath.mana_cost = 0.5
+ShadowWordDeath.cooldown_duration = 20
+ShadowWordDeath.insanity_gain = 4
+ShadowWordDeath.hasted_cooldown = true
+ShadowWordDeath.equilibrium = 'shadow'
 local VampiricEmbrace = Ability:Add(15286, true, true)
 VampiricEmbrace.buff_duration = 15
 VampiricEmbrace.cooldown_duration = 120
 ------ Procs
 
------- Tier Bonuses
-
 ---- Discipline
 local Atonement = Ability:Add(81749, true, true, 194384)
 Atonement.buff_duration = 15
-local PainSuppression = Ability:Add(33206, true, true)
-PainSuppression.mana_cost = 1.6
-PainSuppression.buff_duration = 8
-PainSuppression.cooldown_duration = 180
 local Penance = Ability:Add(47540, false, true, 47666)
 Penance.mana_cost = 1.6
 Penance.buff_duration = 2
@@ -1017,6 +1041,7 @@ Penance.cooldown_duration = 9
 Penance.hasted_duration = true
 Penance.channel_fully = true
 Penance.equilibrium = 'holy'
+------ Talents
 local DarkReprimand = Ability:Add(400169, false, true, 373130)
 DarkReprimand.mana_cost = 1.6
 DarkReprimand.buff_duration = 2
@@ -1024,6 +1049,17 @@ DarkReprimand.cooldown_duration = 9
 DarkReprimand.hasted_duration = true
 DarkReprimand.channel_fully = true
 DarkReprimand.equilibrium = 'shadow'
+local Expiation = Ability:Add(390832, true, true)
+Expiation.talent_node = 82585
+local InescapableTorment = Ability:Add(373427, false, true, 373442)
+InescapableTorment:AutoAoe()
+local MindbenderDisc = Ability:Add(123040, false, true)
+MindbenderDisc.buff_duration = 12
+MindbenderDisc.cooldown_duration = 60
+local PainSuppression = Ability:Add(33206, true, true)
+PainSuppression.mana_cost = 1.6
+PainSuppression.buff_duration = 8
+PainSuppression.cooldown_duration = 180
 local PowerWordBarrier = Ability:Add(62618, true, true, 81782)
 PowerWordBarrier.mana_cost = 4
 PowerWordBarrier.buff_duration = 10
@@ -1032,21 +1068,6 @@ local PowerWordRadiance = Ability:Add(194509, true, true)
 PowerWordRadiance.mana_cost = 6.5
 PowerWordRadiance.cooldown_duration = 20
 PowerWordRadiance.requires_charge = true
-local PowerWordShield = Ability:Add(17, true, true)
-PowerWordShield.mana_cost = 2.65
-PowerWordShield.buff_duration = 15
-local Rapture = Ability:Add(47536, true, true)
-Rapture.mana_cost = 3.1
-Rapture.buff_duration = 8
-Rapture.cooldown_duration = 90
------- Talents
-local Expiation = Ability:Add(390832, true, true)
-Expiation.talent_node = 82585
-local InescapableTorment = Ability:Add(373427, false, true, 373442)
-InescapableTorment:AutoAoe()
-local MindbenderDisc = Ability:Add(123040, false, true)
-MindbenderDisc.buff_duration = 12
-MindbenderDisc.cooldown_duration = 60
 local PurgeTheWicked = Ability:Add(204197, false, true, 204213)
 PurgeTheWicked.buff_duration = 20
 PurgeTheWicked.mana_cost = 1.8
@@ -1054,6 +1075,10 @@ PurgeTheWicked.tick_interval = 2
 PurgeTheWicked.hasted_ticks = true
 PurgeTheWicked.equilibrium = 'holy'
 PurgeTheWicked:AutoAoe(false, 'apply')
+local Rapture = Ability:Add(47536, true, true)
+Rapture.mana_cost = 3.1
+Rapture.buff_duration = 8
+Rapture.cooldown_duration = 90
 local Schism = Ability:Add(424509, false, true, 214621)
 Schism.buff_duration = 9
 local ShadowCovenant = Ability:Add(314867, true, true, 322105)
@@ -1066,27 +1091,44 @@ TwilightEquilibrium.Shadow = Ability:Add(390707, true, true)
 TwilightEquilibrium.Shadow.buff_duration = 6
 local VoidSummoner = Ability:Add(390770, true, true)
 ------ Procs
+
 ---- Holy
 local HolyFire = Ability:Add(14914, false, true)
 HolyFire.cooldown_duration = 10
 HolyFire.mana_cost = 1
 HolyFire.buff_duration = 7
 HolyFire.tick_interval = 1
+HolyFire.triggers_combat = true
+------ Talents
 local HolyWordChastise = Ability:Add(88625, false, true)
 HolyWordChastise.cooldown_duration = 60
 HolyWordChastise.mana_cost = 2
-local Renew = Ability:Add(139, true, true)
-Renew.mana_cost = 1.8
-Renew.buff_duration = 15
-Renew.tick_interval = 3
-Renew.hasted_ticks = true
------- Talents
-
+HolyWordChastise.triggers_combat = true
 ------ Procs
 
------- Tier Bonuses
-
 ---- Shadow
+local MindFlay = Ability:Add(15407, false, true)
+MindFlay.buff_duration = 4.5
+MindFlay.tick_interval = 0.75
+MindFlay.insanity_gain = 2
+MindFlay.hasted_duration = true
+MindFlay.hasted_ticks = true
+local Shadowform = Ability:Add(232698, true, true)
+local VampiricTouch = Ability:Add(34914, false, true)
+VampiricTouch.buff_duration = 21
+VampiricTouch.tick_interval = 3
+VampiricTouch.insanity_gain = 5
+VampiricTouch.hasted_ticks = true
+VampiricTouch.triggers_combat = true
+VampiricTouch:TrackAuras()
+VampiricTouch:AutoAoe(false, 'apply')
+------ Talents
+local DarkAscension = Ability:Add(391109, true, true)
+DarkAscension.buff_duration = 20
+DarkAscension.cooldown_duration = 60
+DarkAscension.insanity_gain = 30
+local Deathspeaker = Ability:Add(392507, true, true, 392511)
+Deathspeaker.buff_duration = 15
 local DevouringPlague = Ability:Add(335467, false, true)
 DevouringPlague.buff_duration = 6
 DevouringPlague.tick_interval = 3
@@ -1096,85 +1138,81 @@ DevouringPlague:TrackAuras()
 local Dispersion = Ability:Add(47585, true, true)
 Dispersion.buff_duration = 6
 Dispersion.cooldown_duration = 120
-local MindBlast = Ability:Add(8092, false, true)
-MindBlast.mana_cost = 0.25
-MindBlast.cooldown_duration = 7.5
-MindBlast.insanity_gain = 9
-MindBlast.hasted_cooldown = true
-MindBlast.requires_charge = true
-MindBlast.equilibrium = 'shadow'
-local MindFlay = Ability:Add(15407, false, true)
-MindFlay.buff_duration = 4.5
-MindFlay.tick_interval = 0.75
-MindFlay.hasted_duration = true
-MindFlay.hasted_ticks = true
-local MindSear = Ability:Add(48045, false, true)
-MindSear.buff_duration = 4.5
-MindSear.tick_interval = 0.75
-MindSear.hasted_duration = true
-MindSear.hasted_ticks = true
-MindSear.damage = Ability:Add(49821, false, true)
-MindSear.damage:AutoAoe(true)
-local Shadowform = Ability:Add(232698, true, true)
-local ShadowWordDeath = Ability:Add(32379, false, true)
-ShadowWordDeath.mana_cost = 0.5
-ShadowWordDeath.cooldown_duration = 20
-ShadowWordDeath.hasted_cooldown = true
-ShadowWordDeath.equilibrium = 'shadow'
-local Silence = Ability:Add(15487, false, true)
-Silence.cooldown_duration = 45
-Silence.buff_duration = 4
-local VampiricTouch = Ability:Add(34914, false, true)
-VampiricTouch.buff_duration = 21
-VampiricTouch.tick_interval = 3
-VampiricTouch.hasted_ticks = true
-VampiricTouch.insanity_gain = 5
-VampiricTouch:TrackAuras()
-VampiricTouch:AutoAoe(false, 'apply')
-local VoidBolt = Ability:Add(205448, false, true)
-VoidBolt.cooldown_duration = 4.5
-VoidBolt.insanity_gain = 12
-VoidBolt.hasted_cooldown = true
-local VoidEruption = Ability:Add(228260, false, true, 228360)
-VoidEruption.cooldown_duration = 90
-VoidEruption:AutoAoe(true)
-local Voidform = Ability:Add(194249, true, true)
-Voidform.buff_duration = 15
------- Talents
-local Damnation = Ability:Add(341374, false, true)
-Damnation.cooldown_duration = 45
-local HungeringVoid = Ability:Add(345218, false, true, 345219)
-HungeringVoid.buff_duration = 6
+local DistortedReality = Ability:Add(409044, false, true)
+local IdolOfCthun = Ability:Add(377349, false, true)
+local IdolOfYoggSaron = Ability:Add(373273, true, true, 373276)
+IdolOfYoggSaron.buff_duration = 120
+local InsidiousIre = Ability:Add(373212, false, true, 373213)
+InsidiousIre.buff_duration = 12
 local MindbenderShadow = Ability:Add(200174, false, true)
 MindbenderShadow.buff_duration = 15
 MindbenderShadow.cooldown_duration = 60
 local MindDevourer = Ability:Add(373202, true, true, 373204)
 MindDevourer.buff_duration = 15
+local MindFlayInsanity = Ability:Add(391403, false, true)
+MindFlayInsanity.buff_duration = 3
+MindFlayInsanity.tick_interval = 0.75
+MindFlayInsanity.insanity_gain = 4
+MindFlayInsanity.hasted_duration = true
+MindFlayInsanity.hasted_ticks = true
+MindFlayInsanity.buff = Ability:Add(391401, true, true)
+MindFlayInsanity.buff.buff_duration = 15
+local MindsEye = Ability:Add(407470, false, true)
+local MindSpike = Ability:Add(73510, false, true)
+MindSpike.insanity_gain = 4
+MindSpike.triggers_combat = true
+local MindSpikeInsanity = Ability:Add(407466, false, true)
+MindSpikeInsanity.insanity_gain = 8
+MindSpikeInsanity.triggers_combat = true
+MindSpikeInsanity.buff = Ability:Add(407468, true, true)
+MindSpikeInsanity.buff.buff_duration = 15
 local Misery = Ability:Add(238558, false, true)
 local PsychicLink = Ability:Add(199484, false, true, 199486)
+PsychicLink:AutoAoe()
 local ShadowCrash = Ability:Add(205385, false, true, 205386)
-ShadowCrash.cooldown_duration = 30
-ShadowCrash.insanity_gain = 15
-ShadowCrash.hasted_cooldown = true
+ShadowCrash.cooldown_duration = 20
+ShadowCrash.insanity_gain = 6
+ShadowCrash.travel_delay = 1.5
+ShadowCrash.triggers_combat = true
 ShadowCrash:AutoAoe()
-local SurrenderToMadness = Ability:Add(193223, false, true)
-SurrenderToMadness.buff_duration = 30
-SurrenderToMadness.cooldown_duration = 90
+local ShadowyInsight = Ability:Add(375888, true, true, 375981)
+ShadowyInsight.buff_duration = 10
+local Silence = Ability:Add(15487, false, true)
+Silence.cooldown_duration = 45
+Silence.buff_duration = 4
+local ShadowyApparitions = Ability:Add(341491, false, true)
+local SurgeOfInsanity = Ability:Add(391399, false, true)
+local ThoughtHarvester = Ability:Add(406788, false, true)
 local UnfurlingDarkness = Ability:Add(341273, true, true, 341282)
 UnfurlingDarkness.buff_duration = 8
+local VoidBolt = Ability:Add(205448, false, true)
+VoidBolt.cooldown_duration = 6
+VoidBolt.insanity_gain = 10
+VoidBolt.hasted_cooldown = true
+VoidBolt.triggers_combat = true
+VoidBolt:SetVelocity(40)
+local VoidEruption = Ability:Add(228260, false, true, 228360)
+VoidEruption.cooldown_duration = 120
+VoidEruption.triggers_combat = true
+VoidEruption:AutoAoe(true)
+local Voidform = Ability:Add(194249, true, true)
+Voidform.buff_duration = 15
 local VoidTorrent = Ability:Add(263165, true, true)
 VoidTorrent.buff_duration = 3
-VoidTorrent.cooldown_duration = 30
+VoidTorrent.cooldown_duration = 45
+VoidTorrent.tick_interval = 1
+VoidTorrent.hasted_ticks = true
+local WhisperingShadows = Ability:Add(406777, false, true)
 ------ Procs
-local DarkThought = Ability:Add(341205, true, true, 341207)
-DarkThought.buff_duration = 10
--- Tier set bonuses
 
+-- Tier set bonuses
+local DeathsTorment = Ability:Add(423726, true, true) -- Shadow T31 4pc
+DeathsTorment.buff_duration = 60
 -- Racials
 
 -- PvP talents
 
--- Trinket Effects
+-- Trinket effects
 local SolarMaelstrom = Ability:Add(422146, false, true) -- Belor'relos
 SolarMaelstrom:AutoAoe()
 -- Class cooldowns
@@ -1368,13 +1406,19 @@ function InventoryItem:Usable(seconds)
 end
 
 -- Inventory Items
+local Healthstone = InventoryItem:Add(5512)
+-- Equipment
+local IridalTheEarthsMaster = InventoryItem:Add(208321)
+IridalTheEarthsMaster.cooldown_duration = 180
+local Trinket1 = InventoryItem:Add(0)
+local Trinket2 = InventoryItem:Add(0)
 Trinket.BelorrelosTheSuncaller = InventoryItem:Add(207172)
 Trinket.BelorrelosTheSuncaller.cast_spell = SolarMaelstrom
 Trinket.BelorrelosTheSuncaller.cooldown_duration = 120
 Trinket.BelorrelosTheSuncaller.off_gcd = false
--- Equipment
-local Trinket1 = InventoryItem:Add(0)
-local Trinket2 = InventoryItem:Add(0)
+Trinket.NymuesUnravelingSpindle = InventoryItem:Add(208615)
+Trinket.NymuesUnravelingSpindle.cooldown_duration = 120
+Trinket.NymuesUnravelingSpindle.off_gcd = false
 -- End Inventory Items
 
 -- Start Abilities Functions
@@ -1548,10 +1592,15 @@ function Player:UpdateKnown()
 		Halo.Shadow.known = Halo.known
 		DarkReprimand.known = Penance.known
 	end
-	MindSear.damage.known = MindSear.known
 	Voidform.known = VoidEruption.known
 	VoidBolt.known = VoidEruption.known
+	if MindSpike.known then
+		MindFlay.known = false
+		MindSpikeInsanity.known = SurgeOfInsanity.known
+	end
+	MindFlayInsanity.known = MindFlay.known and SurgeOfInsanity.known
 	SolarMaelstrom.known = Trinket.BelorrelosTheSuncaller:Equipped()
+	DeathsTorment.known = self.spec == SPEC.SHADOW and self.set_bonus.t31 >= 4
 
 	Abilities:Update()
 	SummonedPets:Update()
@@ -1663,6 +1712,7 @@ function Player:Update()
 			end
 		end
 		self.insanity.current = clamp(self.insanity.current, 0, self.insanity.max)
+		self.insanity.deficit = self.insanity.max - self.insanity.current
 	end
 	speed, max_speed = GetUnitSpeed('player')
 	self.moving = speed ~= 0
@@ -1815,7 +1865,12 @@ DivineStar.Usable = Penance.Usable
 Halo.Usable = Penance.Usable
 
 function DarkReprimand:Usable()
-	return ShadowCovenant.known and Ability.Usable(self) and ShadowCovenant:Up() and ShadowCovenant:Remains() >= self:CastTime()
+	if Shadowform.known then
+		return Ability.Usable(self)
+	elseif ShadowCovenant.known then
+		return Ability.Usable(self) and ShadowCovenant:Up() and ShadowCovenant:Remains() >= self:CastTime()
+	end
+	return false
 end
 DivineStar.Shadow.Usable = DarkReprimand.Usable
 Halo.Shadow.Usable = DarkReprimand.Usable
@@ -1844,6 +1899,14 @@ function Shadowform:Remains()
 	return Ability.Remains(self)
 end
 
+function ShadowWordPain:Duration()
+	local duration = self.buff_duration
+	if Misery.known then
+		duration = duration + 5
+	end
+	return duration
+end
+
 function ShadowWordPain:Remains()
 	if Misery.known and VampiricTouch:Casting() then
 		return self:Duration()
@@ -1855,6 +1918,10 @@ function ShadowWordPain:Remains()
 	return max(0, remains)
 end
 PurgeTheWicked.Remains = ShadowWordPain.Remains
+
+function ShadowCrash:InFlight()
+	return (Player.time - self.last_used) < self.travel_delay
+end
 
 function Schism:Remains()
 	if self.known and MindBlast:Casting() then
@@ -1888,27 +1955,76 @@ function DevouringPlague:InsanityCost()
 	if MindDevourer.known and MindDevourer:Up() then
 		return 0
 	end
-	return Ability.InsanityCost(self)
-end
-
-function MindBlast:CastWhileChanneling()
-	return (MindFlay:Channeling() or MindSear:Channeling()) and DarkThought:Up()
-end
-
-function MindBlast:Free()
-	return DarkThought:Up()
+	local cost = Ability.InsanityCost(self)
+	if DistortedReality.known then
+		cost = cost + 5
+	end
+	if MindsEye.known then
+		cost = cost - 5
+	end
+	return max(0, cost)
 end
 
 function MindBlast:CastLanded(...)
 	if InescapableTorment.known then
-		Pet.Mindbender:ExtendAll(1.0)
+		Pet.Mindbender:ExtendAll(MindbenderShadow.known and 0.7 or 1.0)
 	end
 	Ability.CastLanded(self, ...)
 end
 
+function MindBlast:Free()
+	if ShadowyInsight.known and ShadowyInsight:Up() then
+		return true
+	end
+	return false
+end
+
+function MindFlay:Usable(...)
+	if SurgeOfInsanity.known and MindFlayInsanity.buff:Up() then
+		return false
+	end
+	return Ability.Usable(self, ...)
+end
+
+function MindFlayInsanity:Usable(...)
+	if MindFlayInsanity.buff:Down() then
+		return false
+	end
+	return Ability.Usable(self, ...)
+end
+
+function MindSpike:Usable(...)
+	if SurgeOfInsanity.known and MindSpikeInsanity.buff:Up() then
+		return false
+	end
+	return Ability.Usable(self, ...)
+end
+
+function MindSpikeInsanity.buff:Stack()
+	local stack = Ability.Stack(self)
+	if MindSpikeInsanity:Casting() then
+		stack = stack - 1
+	end
+	return max(0, stack)
+end
+
+function MindSpikeInsanity.buff:Remains()
+	if self:Stack() == 0 then
+		return 0
+	end
+	return Ability.Remains(self)
+end
+
+function MindSpikeInsanity:Usable(...)
+	if MindSpikeInsanity.buff:Down() then
+		return false
+	end
+	return Ability.Usable(self, ...)
+end
+
 function ShadowWordDeath:CastLanded(...)
 	if InescapableTorment.known then
-		Pet.Mindbender:ExtendAll(1.0)
+		Pet.Mindbender:ExtendAll(MindbenderShadow.known and 0.7 or 1.0)
 	end
 	Ability.CastLanded(self, ...)
 end
@@ -1941,6 +2057,10 @@ function TwilightEquilibrium.Shadow:Remains()
 		end
 	end
 	return Ability.Remains(self)
+end
+
+function IridalTheEarthsMaster:Usable(...)
+	return Target.health.pct < 35 and InventoryItem.Usable(self, ...)
 end
 
 -- End Ability Modifications
@@ -2275,6 +2395,13 @@ APL[SPEC.HOLY].Main = function(self)
 end
 
 APL[SPEC.SHADOW].Main = function(self)
+	self.use_cds = Opt.cooldown and (
+		(Target.boss or Target.player or (not Opt.boss_only and Target.timeToDie > (Opt.cd_ttd - min(Player.enemies - 1, 6)))) or
+		(PowerInfusion.known and PowerInfusion:Remains() > 8) or
+		(DarkAscension.known and DarkAscension:Remains() > 8) or
+		(VoidEruption.known and Voidform:Remains() > 8) or
+		(Player.fiend_remains > 8)
+	)
 	if Player:TimeInCombat() == 0 then
 --[[
 actions.precombat=flask
@@ -2283,9 +2410,8 @@ actions.precombat+=/augmentation
 actions.precombat+=/snapshot_stats
 actions.precombat+=/shadowform,if=!buff.shadowform.up
 actions.precombat+=/arcane_torrent
-actions.precombat+=/variable,name=mind_sear_cutoff,op=set,value=2
-actions.precombat+=/vampiric_touch,if=!talent.damnation.enabled
-actions.precombat+=/mind_blast,if=talent.damnation.enabled
+actions.precombat+=/shadow_crash,if=raid_event.adds.in>=25&spell_targets.shadow_crash<=8&!fight_style.dungeonslice&(!set_bonus.tier31_4pc|spell_targets.shadow_crash>1)
+actions.precombat+=/vampiric_touch,if=!talent.shadow_crash.enabled|raid_event.adds.in<25|spell_targets.shadow_crash>8|fight_style.dungeonslice|set_bonus.tier31_4pc&spell_targets.shadow_crash=1
 ]]
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
@@ -2293,11 +2419,11 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 		if Shadowform:Usable() and Shadowform:Down() then
 			return Shadowform
 		end
-		if VampiricTouch:Usable() and VampiricTouch:Down() and not Damnation.known then
-			return VampiricTouch
+		if ShadowCrash:Usable() then
+			UseCooldown(ShadowCrash)
 		end
-		if MindBlast:Usable() and Damnation.known then
-			return MindBlast
+		if VampiricTouch:Usable() and VampiricTouch:Down() and not (ShadowCrash.known and WhisperingShadows.known and ShadowCrash:InFlight()) then
+			return VampiricTouch
 		end
 	else
 		if PowerWordFortitude:Down() and PowerWordFortitude:Usable() then
@@ -2308,71 +2434,125 @@ actions.precombat+=/mind_blast,if=talent.damnation.enabled
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player.health.pct < Opt.heal or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.heal or Player:UnderMeleeAttack()) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
 	elseif self.use_cds and Player.health.pct < Opt.heal and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
 --[[
-actions=potion,if=buff.power_infusion.up&(buff.bloodlust.up|(time+fight_remains)>=320)
-actions+=/antumbra_swap,if=buff.singularity_supreme_lockout.up&!buff.power_infusion.up&!buff.voidform.up&!pet.fiend.active&!buff.singularity_supreme.up&!buff.swap_stat_compensation.up&!buff.bloodlust.up&!((fight_remains+time)>=330&time<=200|(fight_remains+time)<=250&(fight_remains+time)>=200)
-actions+=/antumbra_swap,if=buff.swap_stat_compensation.up&!buff.singularity_supreme_lockout.up&(cooldown.power_infusion.remains<=30&cooldown.void_eruption.remains<=30&!((time>80&time<100)&((fight_remains+time)>=330&time<=200|(fight_remains+time)<=250&(fight_remains+time)>=200))|fight_remains<=40)
-actions+=/variable,name=dots_up,op=set,value=dot.shadow_word_pain.ticking&dot.vampiric_touch.ticking
-actions+=/variable,name=all_dots_up,op=set,value=dot.shadow_word_pain.ticking&dot.vampiric_touch.ticking&dot.devouring_plague.ticking
-actions+=/variable,name=five_minutes_viable,op=set,value=(fight_remains+time)>=60*5+20
-actions+=/variable,name=four_minutes_viable,op=set,value=!variable.five_minutes_viable&(fight_remains+time)>=60*4+20
-actions+=/variable,name=do_three_mins,op=set,value=(variable.five_minutes_viable|!variable.five_minutes_viable&!variable.four_minutes_viable)&time<=200
-actions+=/variable,name=cd_management,op=set,value=variable.do_three_mins|(variable.four_minutes_viable&cooldown.power_infusion.remains<=gcd.max*3|variable.five_minutes_viable&time>300)|fight_remains<=25,default=0
-actions+=/variable,name=max_vts,op=set,default=1,value=spell_targets.vampiric_touch
-actions+=/variable,name=max_vts,op=set,value=(spell_targets.mind_sear<=5)*spell_targets.mind_sear,if=buff.voidform.up
-actions+=/variable,name=is_vt_possible,op=set,value=0,default=1
-actions+=/variable,name=is_vt_possible,op=set,value=1,target_if=max:(target.time_to_die*dot.vampiric_touch.refreshable),if=target.time_to_die>=18
-actions+=/variable,name=vts_applied,op=set,value=active_dot.vampiric_touch>=variable.max_vts|!variable.is_vt_possible
-actions+=/variable,name=pool_for_cds,op=set,value=cooldown.void_eruption.up&variable.cd_management
-actions+=/variable,name=on_use_trinket,value=equipped.shadowed_orb_of_torment+equipped.moonlit_prism+equipped.neural_synapse_enhancer+equipped.fleshrenders_meathook+equipped.scars_of_fraternal_strife+equipped.the_first_sigil+equipped.soulletting_ruby+equipped.inscrutable_quantum_device
-actions+=/blood_fury,if=buff.power_infusion.up
-actions+=/fireblood,if=buff.power_infusion.up
-actions+=/berserking,if=buff.power_infusion.up
-actions+=/lights_judgment,if=spell_targets.lights_judgment>=2|(!raid_event.adds.exists|raid_event.adds.in>75)
-actions+=/ancestral_call,if=buff.power_infusion.up
-actions+=/use_item,name=hyperthread_wristwraps,if=0
-actions+=/use_item,name=ring_of_collapsing_futures,if=(buff.temptation.stack<1&target.time_to_die>60)|target.time_to_die<60
-actions+=/call_action_list,name=cwc
+actions=variable,name=holding_crash,op=set,value=raid_event.adds.in<15
+actions+=/variable,name=pool_for_cds,op=set,value=(cooldown.void_eruption.remains<=gcd.max*3&talent.void_eruption|cooldown.dark_ascension.up&talent.dark_ascension)|talent.void_torrent&talent.psychic_link&cooldown.void_torrent.remains<=4&(!raid_event.adds.exists&spell_targets.vampiric_touch>1|raid_event.adds.in<=5|raid_event.adds.remains>=6&!variable.holding_crash)&!buff.voidform.up
+actions+=/run_action_list,name=aoe,if=active_enemies>2
 actions+=/run_action_list,name=main
 ]]
-	self.dots_up = ShadowWordPain:Up() and VampiricTouch:Up()
-	self.all_dots_up = self.dots_up and DevouringPlague:Up()
-	self.mind_sear_cutoff = 2
-	self.five_minutes_viable = (Target.timeToDie + Player:TimeInCombat()) >= (60 * 5 + 20)
-	self.four_minutes_viable = not self.five_minutes_viable and (Target.timeToDie + Player:TimeInCombat()) >= (60 * 4 + 20)
-	self.do_three_mins = (self.five_minutes_viable or not self.four_minutes_viable) and Player:TimeInCombat() <= 200
-	self.cd_management = self.do_three_mins or (self.four_minutes_viable and PowerInfusion:Ready(Player.gcd * 3)) or (self.five_minutes_viable and Player:TimeInCombat() > 300) or Target.timeToDie <= 25
-	self.max_vts = Player.enemies
-	if Voidform:Up() then
-		self.max_vts = Player.enemies <= 5 and Player.enemies or 0
-	end
-	self.vts_applied = Target.timeToDie < 18 or VampiricTouch:Ticking() >= self.max_vts
-	self.pool_for_cds = VoidEruption:Ready() and self.cd_management
-	self.on_use_trinket = Trinket1.can_use or Trinket2.can_use
-	if MindFlay:Channeling() or MindSear:Channeling() then
-		local apl = self:cwc()
-		if apl then return apl end
+	self.holding_crash = false
+	self.pool_for_cds = self.use_cds and ((VoidEruption.known and VoidEruption:Ready(Player.gcd * 3)) or (DarkAscension.known and DarkAscension:Ready()) or (VoidTorrent.known and PsychicLink.known and VoidTorrent:Ready(4) and Voidform:Down()))
+	if Player.enemies > 2 then
+		return self:aoe()
 	end
 	return self:main()
 end
 
+APL[SPEC.SHADOW].aoe = function(self)
+--[[
+actions.aoe=call_action_list,name=aoe_variables
+actions.aoe+=/vampiric_touch,target_if=refreshable&target.time_to_die>=18&(dot.vampiric_touch.ticking|!variable.dots_up),if=variable.max_vts>0&!variable.manual_vts_applied&!action.shadow_crash.in_flight|!talent.whispering_shadows
+actions.aoe+=/shadow_crash,if=!variable.holding_crash,target_if=dot.vampiric_touch.refreshable|dot.vampiric_touch.remains<=target.time_to_die&!buff.voidform.up&(raid_event.adds.in-dot.vampiric_touch.remains)<15
+actions.aoe+=/call_action_list,name=cds,if=fight_remains<30|target.time_to_die>15&(!variable.holding_crash|active_enemies>2)
+actions.aoe+=/mindbender,if=(dot.shadow_word_pain.ticking&variable.dots_up|action.shadow_crash.in_flight&talent.whispering_shadows)&(fight_remains<30|target.time_to_die>15)&(!talent.dark_ascension|cooldown.dark_ascension.remains<gcd.max|fight_remains<15)
+actions.aoe+=/devouring_plague,target_if=max:target.time_to_die*(!dot.devouring_plague.ticking),if=talent.distorted_reality&(active_dot.devouring_plague=0|insanity.deficit<=20)
+actions.aoe+=/shadow_word_death,target_if=max:dot.devouring_plague.remains,if=(set_bonus.tier31_4pc|pet.fiend.active&talent.inescapable_torment&set_bonus.tier31_2pc)
+actions.aoe+=/mind_blast,target_if=max:dot.devouring_plague.remains,if=(cooldown.mind_blast.full_recharge_time<=gcd.max+cast_time|pet.fiend.remains<=cast_time+gcd.max)&pet.fiend.active&talent.inescapable_torment&pet.fiend.remains>cast_time&active_enemies<=7&!buff.mind_devourer.up&dot.devouring_plague.remains>execute_time
+actions.aoe+=/shadow_word_death,target_if=max:dot.devouring_plague.remains,if=pet.fiend.remains<=2&pet.fiend.active&talent.inescapable_torment&active_enemies<=7
+actions.aoe+=/void_bolt,target_if=max:target.time_to_die
+actions.aoe+=/devouring_plague,target_if=max:target.time_to_die*(!dot.devouring_plague.ticking),if=talent.distorted_reality
+actions.aoe+=/devouring_plague,if=(remains<=gcd.max&!variable.pool_for_cds|insanity.deficit<=20|buff.voidform.up&cooldown.void_bolt.remains>buff.voidform.remains&cooldown.void_bolt.remains<=buff.voidform.remains+2)&!talent.distorted_reality
+actions.aoe+=/vampiric_touch,target_if=refreshable&target.time_to_die>=18&(dot.vampiric_touch.ticking|!variable.dots_up),if=variable.max_vts>0&(cooldown.shadow_crash.remains>=dot.vampiric_touch.remains|variable.holding_crash)&!action.shadow_crash.in_flight|!talent.whispering_shadows
+actions.aoe+=/shadow_word_death,target_if=max:dot.devouring_plague.remains,if=variable.dots_up&talent.inescapable_torment&pet.fiend.active&((!talent.insidious_ire&!talent.idol_of_yoggsaron)|buff.deathspeaker.up)&!set_bonus.tier31_2pc
+actions.aoe+=/mind_spike_insanity,target_if=max:dot.devouring_plague.remains,if=variable.dots_up&cooldown.mind_blast.full_recharge_time>=gcd*3&talent.idol_of_cthun&(!cooldown.void_torrent.up|!talent.void_torrent)
+actions.aoe+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mind_flay_insanity.up&variable.dots_up&cooldown.mind_blast.full_recharge_time>=gcd*3&talent.idol_of_cthun&(!cooldown.void_torrent.up|!talent.void_torrent)
+actions.aoe+=/mind_blast,target_if=max:dot.devouring_plague.remains,if=variable.dots_up&(!buff.mind_devourer.up|cooldown.void_eruption.up&talent.void_eruption)
+actions.aoe+=/void_torrent,target_if=max:dot.devouring_plague.remains,if=(!variable.holding_crash|raid_event.adds.count%(active_dot.vampiric_touch+raid_event.adds.count)<1.5)&(dot.devouring_plague.remains>=2.5|buff.voidform.up)
+actions.aoe+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mind_flay_insanity.up&talent.idol_of_cthun,interrupt_if=ticks>=2,interrupt_immediate=1
+actions.aoe+=/call_action_list,name=filler
+]]
+	self:aoe_variables()
+	return self:main()
+	--return self:filler()
+end
+
+APL[SPEC.SHADOW].aoe_variables = function(self)
+--[[
+actions.aoe_variables=variable,name=max_vts,op=set,default=12,value=spell_targets.vampiric_touch>?12
+actions.aoe_variables+=/variable,name=is_vt_possible,op=set,value=0,default=1
+actions.aoe_variables+=/variable,name=is_vt_possible,op=set,value=1,target_if=max:(target.time_to_die*dot.vampiric_touch.refreshable),if=target.time_to_die>=18
+# TODO: Revamp to fix undesired behaviour with unstacked fights
+actions.aoe_variables+=/variable,name=dots_up,op=set,value=(active_dot.vampiric_touch+8*(action.shadow_crash.in_flight&talent.whispering_shadows))>=variable.max_vts|!variable.is_vt_possible
+actions.aoe_variables+=/variable,name=holding_crash,op=set,value=(variable.max_vts-active_dot.vampiric_touch)<4|raid_event.adds.in<10&raid_event.adds.count>(variable.max_vts-active_dot.vampiric_touch),if=variable.holding_crash&talent.whispering_shadows
+actions.aoe_variables+=/variable,name=manual_vts_applied,op=set,value=(active_dot.vampiric_touch+8*!variable.holding_crash)>=variable.max_vts|!variable.is_vt_possible
+]]
+	self.max_vts = min(12, Player.enemies)
+	self.is_vt_possible = Target.timeToDie >= 18
+	self.dots_up = (not self.is_vt_possible) or (VampiricTouch:Ticking() + (WhisperingShadows.known and ShadowCrash:InFlight() and 8 or 0)) >= self.max_vts
+	self.holding_crash = false
+	self.manual_vts_applied = (not self.is_vt_possible) or (VampiricTouch:Ticking() + (not self.holding_crash and 8 or 0)) >= self.max_vts
+end
+
 APL[SPEC.SHADOW].cds = function(self)
 --[[
-actions.cds=power_infusion,if=buff.voidform.up&(!variable.five_minutes_viable|time>300|time<235)|fight_remains<=25
+actions.cds=potion,if=buff.voidform.up|buff.power_infusion.up|buff.dark_ascension.up&(fight_remains<=cooldown.power_infusion.remains+15)|fight_remains<=30
+actions.cds+=/fireblood,if=buff.power_infusion.up|fight_remains<=8
+actions.cds+=/berserking,if=buff.power_infusion.up|fight_remains<=12
+actions.cds+=/blood_fury,if=buff.power_infusion.up|fight_remains<=15
+actions.cds+=/ancestral_call,if=buff.power_infusion.up|fight_remains<=15
+# Use Nymue's before we go into our cooldowns
+actions.cds+=/use_item,name=nymues_unraveling_spindle,if=variable.dots_up&(fight_remains<30|target.time_to_die>15)&(!talent.dark_ascension|cooldown.dark_ascension.remains<3+gcd.max|fight_remains<15)
+# Use Belor'relos, the Suncaller before we go into our cooldowns
+actions.cds+=/use_item,name=belorrelos_the_suncaller,use_off_gcd=1,if=gcd.remains>0&(!raid_event.adds.exists&!prev_gcd.1.mindbender|raid_event.adds.up|spell_targets.belorrelos_the_suncaller>=5)|fight_remains<20
+# Fit in a Divine Star as you cast Belor's for the free GCD.
+actions.cds+=/divine_star,if=(raid_event.adds.up|spell_targets.belorrelos_the_suncaller>=5)&equipped.belorrelos_the_suncaller&trinket.belorrelos_the_suncaller.cooldown.remains<=gcd.max
+# Sync Power Infusion with Voidform or Dark Ascension
+actions.cds+=/power_infusion,if=(buff.voidform.up|buff.dark_ascension.up)
+# Use <a href='https://www.wowhead.com/spell=10060/power-infusion'>Power Infusion</a> while <a href='https://www.wowhead.com/spell=194249/voidform'>Voidform</a> or <a href='https://www.wowhead.com/spell=391109/dark-ascension'>Dark Ascension</a> is active. Chain directly after your own <a href='https://www.wowhead.com/spell=10060/power-infusion'>Power Infusion</a>.
+actions.cds+=/invoke_external_buff,name=power_infusion,if=(buff.voidform.up|buff.dark_ascension.up)&!buff.power_infusion.up
+# Make sure Mindbender is active before popping Void Eruption and dump charges of Mind Blast before casting
+actions.cds+=/void_eruption,if=!cooldown.fiend.up&(pet.fiend.active&cooldown.fiend.remains>=4|!talent.mindbender|active_enemies>2&!talent.inescapable_torment.rank)&(cooldown.mind_blast.charges=0|time>15)
+# Make sure Mindbender is active before popping Dark Ascension unless you have insignificant talent points or too many targets
+actions.cds+=/dark_ascension,if=pet.fiend.active&cooldown.fiend.remains>=4|!talent.mindbender&!cooldown.fiend.up|active_enemies>2&!talent.inescapable_torment
 actions.cds+=/call_action_list,name=trinkets
-actions.cds+=/mindbender,if=dot.shadow_word_pain.ticking&variable.vts_applied
+# Use Desperate Prayer to heal up should Shadow Word: Death or other damage bring you below 75%
 actions.cds+=/desperate_prayer,if=health.pct<=75
 ]]
-	if PowerInfusion:Usable() and ((Voidform:Up() and (not self.five_minutes_viable or not between(Player:TimeInCombat(), 235, 300))) or (Target.boss and Target.timeToDie <= 25)) then
+	if Opt.trinket and Trinket.NymuesUnravelingSpindle:Usable() and self.dots_up and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (not DarkAscension.known or DarkAscension:Ready(3 + Player.gcd) or (Target.boss and Target.timeToDie < 15)) then
+		return UseCooldown(Trinket.NymuesUnravelingSpindle)
+	end
+	if Opt.trinket and Trinket.BelorrelosTheSuncaller:Usable() then
+		return UseCooldown(Trinket.BelorrelosTheSuncaller)
+	end
+	if PowerInfusion:Usable() and (
+		(not (Voidform.known or DarkAscension.known) and Player.fiend_up) or
+		(Voidform.known and Voidform:Up()) or
+		(DarkAscension.known and DarkAscension:Up()) or
+		(Target.boss and Target.timeToDie < 20)
+	) then
 		return UseCooldown(PowerInfusion)
 	end
-	if MindbenderShadow:Usable() and self.vts_applied and ShadowWordPain:Up() then
-		return UseCooldown(MindbenderShadow)
+	if VoidEruption:Usable() and (MindBlast:Charges() == 0 or Player:TimeInCombat() > 15) and not Player.fiend:Ready() and (
+		(Player.fiend_up and not Player.fiend:Ready(4)) or
+		not MindbenderShadow.known or
+		(Player.enemies > 2 and not InescapableTorment.known)
+	) then
+		return UseCooldown(VoidEruption)
+	end
+	if DarkAscension:Usable() and (
+		(Player.fiend_up and not Player.fiend:Ready(4)) or
+		(not MindbenderShadow.known and not Player.fiend:Ready()) or
+		(Player.enemies > 2 and not InescapableTorment.known)
+	) then
+		return UseCooldown(DarkAscension)
+	end
+	if IridalTheEarthsMaster:Usable() then
+		return UseCooldown(IridalTheEarthsMaster)
 	end
 	if Opt.trinket then
 		self:trinkets()
@@ -2381,161 +2561,178 @@ end
 
 APL[SPEC.SHADOW].trinkets = function(self)
 --[[
-actions.trinkets=use_item,name=scars_of_fraternal_strife,if=!buff.scars_of_fraternal_strife_4.up
-actions.trinkets+=/use_item,name=empyreal_ordnance,if=cooldown.void_eruption.remains<=12|cooldown.void_eruption.remains>27
-actions.trinkets+=/use_item,name=inscrutable_quantum_device,if=buff.voidform.up&buff.power_infusion.up|fight_remains<=20|buff.power_infusion.up&cooldown.void_eruption.remains+15>fight_remains|buff.voidform.up&cooldown.power_infusion.remains+15>fight_remains|(cooldown.power_infusion.remains>=10&cooldown.void_eruption.remains>=10)&fight_remains>=190
-actions.trinkets+=/use_item,name=macabre_sheet_music,if=cooldown.void_eruption.remains>10
-actions.trinkets+=/use_item,name=soulletting_ruby,if=buff.power_infusion.up|!priest.self_power_infusion|equipped.shadowed_orb_of_torment,target_if=min:target.health.pct
-actions.trinkets+=/use_item,name=the_first_sigil,if=buff.voidform.up|buff.power_infusion.up|!priest.self_power_infusion|cooldown.void_eruption.remains>10|(equipped.soulletting_ruby&!trinket.soulletting_ruby.cooldown.up)|fight_remains<20
-actions.trinkets+=/use_item,name=scars_of_fraternal_strife,if=buff.scars_of_fraternal_strife_4.up&((variable.on_use_trinket>=2&!equipped.shadowed_orb_of_torment)&cooldown.power_infusion.remains<=20&cooldown.void_eruption.remains<=(20-5*talent.ancient_madness)|buff.voidform.up&buff.power_infusion.up&(equipped.shadowed_orb_of_torment|variable.on_use_trinket<=1))&fight_remains<=80|fight_remains<=30
-actions.trinkets+=/use_item,name=neural_synapse_enhancer,if=buff.voidform.up&buff.power_infusion.up|pet.fiend.active&cooldown.power_infusion.remains>=10*gcd.max
-actions.trinkets+=/use_item,name=sinful_gladiators_badge_of_ferocity,if=cooldown.void_eruption.remains>=10
-actions.trinkets+=/use_item,name=shadowed_orb_of_torment,if=cooldown.power_infusion.remains<=10&cooldown.void_eruption.remains<=10|covenant.night_fae&(!buff.voidform.up|prev_gcd.1.void_bolt)|fight_remains<=40
-actions.trinkets+=/use_item,name=architects_ingenuity_core
-actions.trinkets+=/use_items,if=buff.voidform.up|buff.power_infusion.up|cooldown.void_eruption.remains>10
+actions.trinkets=use_item,name=voidmenders_shadowgem,if=(buff.power_infusion.up|fight_remains<20)&equipped.voidmenders_shadowgem
+actions.trinkets+=/use_item,name=iridal_the_earths_master,use_off_gcd=1,if=gcd.remains>0|fight_remains<20
+actions.trinkets+=/use_item,name=dreambinder_loom_of_the_great_cycle,use_off_gcd=1,if=gcd.remains>0|fight_remains<20
+actions.trinkets+=/use_item,name=darkmoon_deck_box_inferno,if=equipped.darkmoon_deck_box_inferno
+actions.trinkets+=/use_item,name=darkmoon_deck_box_rime,if=equipped.darkmoon_deck_box_rime
+actions.trinkets+=/use_item,name=darkmoon_deck_box_dance,if=equipped.darkmoon_deck_box_dance
+# Use Erupting Spear Fragment with cooldowns, adds are currently active, or the fight will end in less than 20 seconds
+actions.trinkets+=/use_item,name=erupting_spear_fragment,if=(buff.power_infusion.up|raid_event.adds.up|fight_remains<20)&equipped.erupting_spear_fragment
+# Use Beacon to the Beyond on cooldown except to hold for incoming adds or if already facing 5 or more targets
+actions.trinkets+=/use_item,name=beacon_to_the_beyond,if=(!raid_event.adds.exists|raid_event.adds.up|spell_targets.beacon_to_the_beyond>=5|fight_remains<20)&equipped.beacon_to_the_beyond
+actions.trinkets+=/use_items,if=buff.voidform.up|buff.power_infusion.up|buff.dark_ascension.up|(cooldown.void_eruption.remains>10&trinket.cooldown.duration<=60)|fight_remains<20
+actions.trinkets+=/use_item,name=desperate_invokers_codex,if=equipped.desperate_invokers_codex
 ]]
-	if Trinket1:Usable() and (Voidform:Up() or PowerInfusion:Up() or not VoidEruption:Ready(10)) then
+	if Trinket1:Usable() and (Voidform:Up() or PowerInfusion:Up() or DarkAscension:Up() or (Target.boss and Target.timeToDie < 20)) then
 		return UseCooldown(Trinket1)
 	end
-	if Trinket2:Usable() and (Voidform:Up() or PowerInfusion:Up() or not VoidEruption:Ready(10)) then
+	if Trinket2:Usable() and (Voidform:Up() or PowerInfusion:Up() or DarkAscension:Up() or (Target.boss and Target.timeToDie < 20)) then
 		return UseCooldown(Trinket2)
-	end
-end
-
-APL[SPEC.SHADOW].cwc = function(self)
---[[
-actions.cwc+=/mind_blast,only_cwc=1
-]]
-	if MindBlast:Usable() and MindBlast:CastWhileChanneling() then
-		return MindBlast
 	end
 end
 
 APL[SPEC.SHADOW].main = function(self)
 --[[
-actions.main+=/call_action_list,name=cds
-actions.main+=/damnation,target_if=(dot.vampiric_touch.refreshable|dot.shadow_word_pain.refreshable|(!buff.mind_devourer.up&insanity<50))
-actions.main+=/mind_blast,if=(cooldown.mind_blast.full_recharge_time<=gcd.max*2&(debuff.hungering_void.up|!talent.hungering_void.enabled)
-actions.main+=/mindgames,target_if=insanity<90&((variable.all_dots_up&(!cooldown.void_eruption.up|!variable.cd_management))|buff.voidform.up)&(!talent.hungering_void.enabled|debuff.hungering_void.remains>cast_time|!buff.voidform.up)
-actions.main+=/void_bolt,if=talent.hungering_void
-actions.main+=/devouring_plague,if=(refreshable|insanity>75|talent.void_torrent.enabled&cooldown.void_torrent.remains<=3*gcd&!buff.voidform.up|buff.voidform.up&(cooldown.mind_blast.charges_fractional<2|buff.mind_devourer.up))&(!variable.pool_for_cds|insanity>=85)
-actions.main+=/void_bolt,if=talent.hungering_void.enabled
-actions.main+=/shadow_word_death,target_if=target.health.pct<20&spell_targets.mind_sear<4)
-actions.main+=/surrender_to_madness,target_if=target.time_to_die<25&buff.voidform.down
-actions.main+=/void_torrent,target_if=variable.dots_up&(buff.voidform.down|buff.voidform.remains<cooldown.void_bolt.remains|prev_gcd.1.void_bolt&!buff.bloodlust.react&spell_targets.mind_sear<3)&variable.vts_applied&spell_targets.mind_sear<(5+(6*talent.twist_of_fate.enabled))
-actions.main+=/shadow_crash,if=raid_event.adds.in>10
-actions.main+=/mind_sear,target_if=spell_targets.mind_sear>variable.mind_sear_cutoff&buff.dark_thought.up,chain=1,interrupt_immediate=1,interrupt_if=ticks>=4
-actions.main+=/mind_flay,if=buff.dark_thought.up&variable.dots_up&!buff.voidform.up&!variable.pool_for_cds&cooldown.mind_blast.full_recharge_time>=gcd.max,chain=1,interrupt_immediate=1,interrupt_if=ticks>=4&!buff.dark_thought.up
+actions.main=variable,name=dots_up,op=set,value=active_dot.vampiric_touch=active_enemies|action.shadow_crash.in_flight&talent.whispering_shadows
+actions.main+=/call_action_list,name=cds,if=fight_remains<30|target.time_to_die>15&(!variable.holding_crash|active_enemies>2)
+actions.main+=/mindbender,if=variable.dots_up&(fight_remains<30|target.time_to_die>15)&(!talent.dark_ascension|cooldown.dark_ascension.remains<gcd.max|fight_remains<15)
+actions.main+=/devouring_plague,target_if=!talent.distorted_reality|active_enemies=1|remains<=gcd.max,if=remains<=gcd.max|insanity.deficit<=16
+actions.main+=/shadow_word_death,if=(set_bonus.tier31_4pc|pet.fiend.active&talent.inescapable_torment&set_bonus.tier31_2pc)&dot.devouring_plague.ticking
+actions.main+=/mind_blast,target_if=dot.devouring_plague.remains>execute_time&(cooldown.mind_blast.full_recharge_time<=gcd.max+execute_time)|pet.fiend.remains<=execute_time+gcd.max,if=pet.fiend.active&talent.inescapable_torment&pet.fiend.remains>execute_time&active_enemies<=7
+actions.main+=/shadow_word_death,target_if=dot.devouring_plague.ticking&pet.fiend.remains<=2&pet.fiend.active&talent.inescapable_torment&active_enemies<=7
 actions.main+=/void_bolt,if=variable.dots_up
-actions.main+=/vampiric_touch,target_if=refreshable&target.time_to_die>=18&(dot.vampiric_touch.ticking|!variable.vts_applied)&variable.max_vts>0|(talent.misery.enabled&dot.shadow_word_pain.refreshable)|buff.unfurling_darkness.up
-actions.main+=/shadow_word_pain,if=refreshable&target.time_to_die>4&!talent.misery.enabled&talent.psychic_link.enabled&spell_targets.mind_sear>2
-actions.main+=/shadow_word_pain,target_if=refreshable&target.time_to_die>4&!talent.misery.enabled&(!talent.psychic_link.enabled|(talent.psychic_link.enabled&spell_targets.mind_sear<=2))
-actions.main+=/mind_sear,target_if=spell_targets.mind_sear>variable.mind_sear_cutoff,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2
-actions.main+=/mind_flay,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2&(!buff.dark_thought.up|cooldown.void_bolt.up&buff.voidform.up)
-actions.main+=/shadow_word_death
-actions.main+=/shadow_word_pain
+actions.main+=/devouring_plague,if=fight_remains<=duration+4
+actions.main+=/devouring_plague,target_if=!talent.distorted_reality|active_enemies=1|remains<=gcd.max,if=(remains<=gcd.max|remains<3&cooldown.void_torrent.up)|insanity.deficit<=20|buff.voidform.up&cooldown.void_bolt.remains>buff.voidform.remains&cooldown.void_bolt.remains<=buff.voidform.remains+2|buff.mind_devourer.up&pmultiplier<1.2
+actions.main+=/shadow_word_death,if=set_bonus.tier31_2pc
+actions.main+=/shadow_crash,if=!variable.holding_crash&(dot.vampiric_touch.refreshable|buff.deaths_torment.stack>9&set_bonus.tier31_4pc)
+actions.main+=/shadow_word_pain,if=buff.deaths_torment.stack>9&set_bonus.tier31_4pc&(!variable.holding_crash|!talent.shadow_crash)
+actions.main+=/shadow_word_death,if=variable.dots_up&talent.inescapable_torment&pet.fiend.active&((!talent.insidious_ire&!talent.idol_of_yoggsaron)|buff.deathspeaker.up)&!set_bonus.tier31_2pc
+actions.main+=/vampiric_touch,target_if=min:remains,if=refreshable&target.time_to_die>=12&(cooldown.shadow_crash.remains>=dot.vampiric_touch.remains&!action.shadow_crash.in_flight|variable.holding_crash|!talent.whispering_shadows)
+actions.main+=/mind_blast,if=(!buff.mind_devourer.up|cooldown.void_eruption.up&talent.void_eruption)
+actions.main+=/void_torrent,if=!variable.holding_crash,target_if=dot.devouring_plague.remains>=2.5,interrupt_if=cooldown.shadow_word_death.ready&pet.fiend.active&set_bonus.tier31_2pc
+actions.main+=/call_action_list,name=filler
 ]]
-	self:cds()
-	if Damnation:Usable() and (VampiricTouch:Refreshable() or ShadowWordPain:Refreshable() or (MindDevourer:Down() and Player.insanity.current < 50)) then
-		return Damnation
-	end
-	if HungeringVoid.known and VoidBolt:Usable() then
-		return VoidBolt
-	end
-	if DevouringPlague:Usable() and (
-		((not self.pool_for_cds or Player.insanity.current >= 85) and (DevouringPlague:Refreshable() or Player.insanity.current > 75 or (VoidTorrent.known and VoidTorrent:Ready(Player.gcd * 3) and Voidform:Down()) or (Voidform:Up() and (MindBlast:ChargesFractional() < 2 or MindDevourer:Up()))))
+	self.dots_up = VampiricTouch:Ticking() >= Player.enemies or (WhisperingShadows.known and ShadowCrash:InFlight())
+	if self.use_cds and (
+		(Target.boss and Target.timeToDie < 30) or
+		(Target.timeToDie > 15 and (not self.holding_crash or Player.enemies > 2))
 	) then
+		self:cds()
+	end
+	if Player.fiend:Usable() and self.dots_up and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (not DarkAscension.known or DarkAscension:Ready(Player.gcd) or (Target.boss and Target.timeToDie < 15)) then
+		UseCooldown(Player.fiend)
+	end
+	if DevouringPlague:Usable() and (DevouringPlague:Remains() <= Player.gcd or Player.insanity.deficit <= 16) then
 		return DevouringPlague
 	end
-	if HungeringVoid.known and VoidBolt:Usable() then
-		return VoidBolt
-	end
-	if ShadowWordDeath:Usable() and Target.health.pct < 20 and Player.enemies < 4 then
+	if ShadowWordDeath:Usable() and DevouringPlague:Up() and (
+		DeathsTorment.known or
+		(InescapableTorment.known and Player.fiend_up and Player.set_bonus.t31 >= 2)
+	) then
 		return ShadowWordDeath
 	end
-	if SurrenderToMadness:Usable() and Target.timeToDie < 25 and Voidform:Down() then
-		UseCooldown(SurrenderToMadness)
-	end
-	if VoidTorrent:Usable() and self.dots_up and self.vts_applied and Player.enemies < (5 + (TwistOfFate.known and 6 or 0)) and (Voidform:Down() or Voidform:Remains() < VoidBolt:Cooldown() or (VoidBolt:Previous() and not Player:BloodlustActive() and Player.enemies < 3)) then
-		UseCooldown(VoidTorrent)
-	end
-	if ShadowCrash:Usable() then
-		UseCooldown(ShadowCrash)
-	end
-	if MindSear:Usable() and Player.enemies > self.mind_sear_cutoff and DarkThought:Up() then
-		Player.channel.interrupt_if = self.channel_interrupt[1]
-		if MindSear:Remains() > 1 then
-			return
+	if InescapableTorment.known and Player.fiend_up and Player.enemies <= 7 then
+		if MindBlast:Usable() and Player.fiend_remains > MindBlast:CastTime() then
+			return MindBlast
 		end
-		return MindSear
-	end
-	if MindFlay:Usable() and DarkThought:Up() and self.dots_up and Voidform:Down() and not self.pool_for_cds and MindBlast:FullRechargeTime() >= Player.gcd then
-		Player.channel.interrupt_if = self.channel_interrupt[2]
-		if MindFlay:Remains() > 1 then
-			return
+		if ShadowWordDeath:Usable() and Player.fiend_remains <= 2 and DevouringPlague:Up() then
+			return ShadowWordDeath
 		end
-		return MindFlay
-	end
-	if MindBlast:Usable() and self.dots_up and Target.timeToDie > MindBlast:CastTime() and Player.enemies < (4 + (Misery.known and 2 or 0) + (PsychicLink.known and VampiricTouch:Ticking() or 0)) then
-		return MindBlast
 	end
 	if VoidBolt:Usable() and self.dots_up then
 		return VoidBolt
 	end
-	if VampiricTouch:Usable() and (
-		(VampiricTouch:Refreshable() and Target.timeToDie >= 18 and (VampiricTouch:Up() or not self.vts_applied) and self.max_vts > 0) or
-		(Misery.known and ShadowWordPain:Refreshable()) or UnfurlingDarkness:Up()
+	if DevouringPlague:Usable() and (
+		Player.insanity.deficit <= 20 or
+		DevouringPlague:Remains() <= Player.gcd or
+		(MindDevourer.known and MindDevourer:Up()) or
+		(Target.boss and Target.timeToDie <= (DevouringPlague:Duration() + 4)) or
+		(VoidTorrent.known and DevouringPlague:Remains() < 3 and VoidTorrent:Ready()) or
+		(Voidform.known and Voidform:Up() and not VoidBolt:Ready(Voidform:Remains()) and VoidBolt:Ready(Voidform:Remains() + 2))
 	) then
-		return VampiricTouch
+		return DevouringPlague
 	end
-	if ShadowWordPain:Usable() and not Misery.known and Target.timeToDie > 4 and ShadowWordPain:Refreshable() and (
-		(PsychicLink.known and Player.enemies > 2) or
-		(not PsychicLink.known or (PsychicLink.known and Player.enemies <= 2))
-	) then
+	if ShadowWordDeath:Usable() and Player.set_bonus.t31 >= 2 then
+		return ShadowWordDeath
+	end
+	if ShadowCrash:Usable() and not self.holding_crash and (VampiricTouch:Refreshable() or (DeathsTorment.known and DeathsTorment:Stack() > 9)) then
+		UseCooldown(ShadowCrash)
+	end
+	if ShadowWordPain:Usable() and DeathsTorment.known and DeathsTorment:Stack() > 9 and (not self.holding_crash or not ShadowCrash.known) then
 		return ShadowWordPain
 	end
-	if Player.moving then
-		if ShadowWordDeath:Usable() then
-			UseCooldown(ShadowWordDeath)
-		end
-		if ShadowWordPain:Usable() then
-			UseCooldown(ShadowWordPain)
-		end
+	if InescapableTorment.known and ShadowWordDeath:Usable() and self.dots_up and Player.fiend_up and Player.set_bonus.t31 < 2 and ((not InsidiousIre.known and not IdolOfYoggSaron.known) or (Deathspeaker.known and Deathspeaker:Up())) then
+		return ShadowWordDeath
 	end
-	if MindSear:Usable() and Player.enemies > self.mind_sear_cutoff then
-		Player.channel.interrupt_if = self.channel_interrupt[3]
-		if MindSear:Remains() > 1 then
-			return
-		end
-		return MindSear
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie >= 12 and (not WhisperingShadows.known or self.holding_crash or (ShadowCrash:Cooldown() >= VampiricTouch:Remains() and not ShadowCrash:InFlight())) then
+		return VampiricTouch
+	end
+	if MindBlast:Usable() and (MindDevourer:Down() or (VoidEruption.known and VoidEruption:Ready())) then
+		return MindBlast
+	end
+	if VoidTorrent:Usable() and not self.holding_crash then
+		UseCooldown(VoidTorrent)
+	end
+	return self:filler()
+end
+
+APL[SPEC.SHADOW].filler = function(self)
+--[[
+actions.filler=vampiric_touch,target_if=min:remains,if=buff.unfurling_darkness.up
+actions.filler+=/shadow_word_death,target_if=target.health.pct<20|(buff.deathspeaker.up|set_bonus.tier31_2pc)&dot.devouring_plague.ticking
+actions.filler+=/mind_spike_insanity,target_if=max:dot.devouring_plague.remains,if=dot.devouring_plague.remains>cast_time
+actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mind_flay_insanity.up
+actions.filler+=/mindgames,target_if=max:dot.devouring_plague.remains
+actions.filler+=/shadow_word_death,target_if=min:target.time_to_die,if=talent.inescapable_torment&pet.fiend.active
+actions.filler+=/halo,if=spell_targets>1
+actions.filler+=/mind_spike,target_if=max:dot.devouring_plague.remains
+actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2
+actions.filler+=/divine_star
+actions.filler+=/shadow_crash,if=raid_event.adds.in>20&!set_bonus.tier31_4pc
+actions.filler+=/shadow_word_death,target_if=target.health.pct<20
+actions.filler+=/shadow_word_death,target_if=max:dot.devouring_plague.remains
+actions.filler+=/shadow_word_pain,target_if=max:dot.devouring_plague.remains,if=set_bonus.tier31_4pc
+actions.filler+=/shadow_word_pain,target_if=min:remains,if=!set_bonus.tier31_4pc
+]]
+	if UnfurlingDarkness.knwon and VampiricTouch:Usable() and UnfurlingDarkness:Up() then
+		return VampiricTouch
+	end
+	if ShadowWordDeath:Usable() and (
+		Target.health.pct < 20 or
+		(DevouringPlague:Up() and ((Deathspeaker.known and Deathspeaker:Up()) or Player.set_bonus.t31 >= 2))
+	) then
+		return ShadowWordDeath
+	end
+	if MindSpikeInsanity:Usable() and DevouringPlague:Remains() > MindSpikeInsanity:CastTime() then
+		return MindSpikeInsanity
+	end
+	if MindFlayInsanity:Usable() then
+		return MindFlayInsanity
+	end
+	if Mindgames:Usable() then
+		return Mindgames
+	end
+	if InescapableTorment.known and ShadowWordDeath:Usable() and Player.fiend_up then
+		return ShadowWordDeath
+	end
+	if Halo:Usable() and Player.enemies > 1 then
+		return Halo
+	end
+	if MindSpike:Usable() then
+		return MindSpike
 	end
 	if MindFlay:Usable() then
-		Player.channel.interrupt_if = self.channel_interrupt[4]
-		if MindFlay:Remains() > 1 then
-			return
-		end
+		Player.channel.interrupt_if = self.channel_interrupt[1]
 		return MindFlay
+	end
+	if DivineStar.Shadow:Usable() then
+		return DivineStar.Shadow
+	end
+	if ShadowCrash:Usable() and not DeathsTorment.known then
+		UseCooldown(ShadowCrash)
 	end
 	if ShadowWordDeath:Usable() then
 		return ShadowWordDeath
 	end
-	if ShadowWordPain:Usable() then
+	if ShadowWordPain:Usable() and not DeathsTorment.known then
 		return ShadowWordPain
 	end
 end
 
 APL[SPEC.SHADOW].channel_interrupt = {
-	[1] = function() -- Mind Sear
-		return Player.channel.ticks >= 4
-	end,
-	[2] = function() -- Mind Flay
-		return Player.channel.ticks >= 4 and DarkThought:Down()
-	end,
-	[3] = function() -- Mind Sear
-		return Player.channel.ticks >= 2
-	end,
-	[4] = function() -- Mind Flay
-		return Player.channel.ticks >= 2 and (DarkThought:Down() or (not VoidBolt:Ready() and Voidform:Up()))
+	[1] = function() -- Mind Flay
+		return Player.channel.ticks >= 1
 	end,
 }
 
@@ -2861,9 +3058,6 @@ function UI:UpdateDisplay()
 			elseif channel.interruptible then
 				dim = false
 			end
-		end
-		if Player.main and Player.main.cwc then
-			dim = false
 		end
 	end
 	if Opt.fiend then
