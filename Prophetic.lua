@@ -2477,8 +2477,95 @@ actions.aoe+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mind_
 actions.aoe+=/call_action_list,name=filler
 ]]
 	self:aoe_variables()
-	return self:main()
-	--return self:filler()
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (
+		not WhisperingShadows.known or
+		(self.max_vts > 0 and not self.manual_vts_applied and not ShadowCrash:InFlight())
+	) then
+		return VampiricTouch
+	end
+	if ShadowCrash:Usable() and not self.holding_crash and (
+		VampiricTouch:Refreshable() or
+		(DeathsTorment.known and DeathsTorment:Stack() >= 11) or
+		(VampiricTouch:Remains() <= Target.timeToDie and Voidform:Down())
+	) then
+		UseCooldown(ShadowCrash)
+	end
+	if self.use_cds and (
+		(Target.boss and Target.timeToDie < 30) or
+		(Target.timeToDie > 15 and (not self.holding_crash or Player.enemies > 2))
+	) then
+		self:cds()
+	end
+	if self.use_cds and Player.fiend:Usable() and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and ((ShadowWordPain:Up() and self.dots_up) or (WhisperingShadows.known and ShadowCrash:InFlight())) and (
+		Target.timeToDie < 15 or (
+			(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
+			(not VoidEruption.known or not between(VoidEruption:Cooldown(), Player.gcd, 45))
+		)
+	) then
+		UseCooldown(Player.fiend)
+	end
+	if DistortedReality.known and DevouringPlague:Usable() and (Player.insanity.deficit <= 20 or DevouringPlague:Ticking() == 0) then
+		return DevouringPlague
+	end
+	if ShadowWordDeath:Usable() and (
+		DeathsTorment.known or
+		(InescapableTorment.known and Player.fiend_up and Player.set_bonus.t31 >= 2)
+	) then
+		return ShadowWordDeath
+	end
+	if InescapableTorment.known and Player.fiend_up and Player.enemies <= 7 then
+		if MindBlast:Usable() and MindDevourer:Down() and Player.fiend_remains > MindBlast:CastTime() and DevouringPlague:Remains() > MindBlast:CastTime() and (
+			MindBlast:FullRechargeTime() <= (MindBlast:CastTime() + Player.gcd) or
+			Player.fiend_remains <= (MindBlast:CastTime() + Player.gcd)
+		) then
+			return MindBlast
+		end
+		if ShadowWordDeath:Usable() and Player.fiend_remains <= 2 then
+			return ShadowWordDeath
+		end
+	end
+	if VoidBolt:Usable() then
+		return VoidBolt
+	end
+	if DevouringPlague:Usable() and (
+		DistortedReality.known or
+		Player.insanity.deficit <= 20 or
+		(DevouringPlague:Remains() <= Player.gcd and not self.pool_for_cds) or
+		(VoidEruption.known and Voidform:Up() and VoidBolt:Cooldown() > Voidform:Remains() and VoidBolt:Cooldown() <= (Voidform:Remains() + 2))
+	) then
+		return DevouringPlague
+	end
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (
+		not WhisperingShadows.known or
+		(self.max_vts > 0 and (self.holding_crash or ShadowCrash:Cooldown() >= VampiricTouch:Remains()) and not ShadowCrash:InFlight())
+	) then
+		return VampiricTouch
+	end
+	if self.dots_up then
+		if InescapableTorment.known and ShadowWordDeath:Usable() and Player.fiend_up and Player.set_bonus.t31 < 2 and (
+			(not (InsidiousIre.known or IdolOfYoggSaron.known)) or
+			(Deathspeaker.known and Deathspeaker:Up())
+		) then
+			return ShadowWordDeath
+		end
+		if IdolOfCthun.known then
+			if MindSpikeInsanity:Usable() and MindBlast:FullRechargeTime() >= (Player.gcd * 3) and (not VoidTorrent.known or not VoidTorrent:Ready()) then
+				return MindSpikeInsanity
+			end
+			if MindFlayInsanity:Usable() and MindBlast:FullRechargeTime() >= (Player.gcd * 3) and (not VoidTorrent.known or not VoidTorrent:Ready()) then
+				Player.channel.interrupt_if = self.channel_interrupt[1]
+				return MindFlayInsanity
+			end
+		end
+		if MindBlast:Usable() and (MindDevourer:Down() or (VoidEruption.known and VoidEruption:Ready())) then
+			return MindBlast
+		end
+		if VoidTorrent:Usable() and (DevouringPlague:Remains() >= 2.5 or Voidform:Up()) then
+			Player.channel.interrupt_if = nil
+			UseCooldown(VoidTorrent)
+		end
+	end
+	return self:filler()
 end
 
 APL[SPEC.SHADOW].aoe_variables = function(self)
@@ -2492,7 +2579,7 @@ actions.aoe_variables+=/variable,name=holding_crash,op=set,value=(variable.max_v
 actions.aoe_variables+=/variable,name=manual_vts_applied,op=set,value=(active_dot.vampiric_touch+8*!variable.holding_crash)>=variable.max_vts|!variable.is_vt_possible
 ]]
 	self.max_vts = min(12, Player.enemies)
-	self.is_vt_possible = Target.timeToDie >= 18
+	self.is_vt_possible = Target.timeToDie >= (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4))
 	self.dots_up = (not self.is_vt_possible) or (VampiricTouch:Ticking() + (WhisperingShadows.known and ShadowCrash:InFlight() and 8 or 0)) >= self.max_vts
 	self.holding_crash = false
 	self.manual_vts_applied = (not self.is_vt_possible) or (VampiricTouch:Ticking() + (not self.holding_crash and 8 or 0)) >= self.max_vts
@@ -2530,8 +2617,8 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 		return UseCooldown(Trinket.BelorrelosTheSuncaller)
 	end
 	if PowerInfusion:Usable() and (
-		(not (Voidform.known or DarkAscension.known) and Player.fiend_up) or
-		(Voidform.known and Voidform:Up()) or
+		(not (VoidEruption.known or DarkAscension.known) and Player.fiend_up) or
+		(VoidEruption.known and Voidform:Up()) or
 		(DarkAscension.known and DarkAscension:Up()) or
 		(Target.boss and Target.timeToDie < 20)
 	) then
@@ -2610,7 +2697,12 @@ actions.main+=/call_action_list,name=filler
 	) then
 		self:cds()
 	end
-	if Player.fiend:Usable() and self.dots_up and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (not DarkAscension.known or DarkAscension:Ready(Player.gcd) or (Target.boss and Target.timeToDie < 15)) then
+	if self.use_cds and Player.fiend:Usable() and self.dots_up and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
+		Target.timeToDie < 15 or (
+			(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
+			(not VoidEruption.known or not between(VoidEruption:Cooldown(), Player.gcd, 45))
+		)
+	) then
 		UseCooldown(Player.fiend)
 	end
 	if DevouringPlague:Usable() and (DevouringPlague:Remains() <= Player.gcd or Player.insanity.deficit <= 16) then
@@ -2639,29 +2731,40 @@ actions.main+=/call_action_list,name=filler
 		(MindDevourer.known and MindDevourer:Up()) or
 		(Target.boss and Target.timeToDie <= (DevouringPlague:Duration() + 4)) or
 		(VoidTorrent.known and DevouringPlague:Remains() < 3 and VoidTorrent:Ready()) or
-		(Voidform.known and Voidform:Up() and not VoidBolt:Ready(Voidform:Remains()) and VoidBolt:Ready(Voidform:Remains() + 2))
+		(VoidEruption.known and Voidform:Up() and VoidBolt:Cooldown() > Voidform:Remains() and VoidBolt:Cooldown() <= (Voidform:Remains() + 2))
 	) then
 		return DevouringPlague
 	end
 	if ShadowWordDeath:Usable() and Player.set_bonus.t31 >= 2 then
 		return ShadowWordDeath
 	end
-	if ShadowCrash:Usable() and not self.holding_crash and (VampiricTouch:Refreshable() or (DeathsTorment.known and DeathsTorment:Stack() > 9)) then
+	if ShadowCrash:Usable() and not self.holding_crash and (
+		(WhisperingShadows.known and VampiricTouch:Refreshable()) or
+		(DeathsTorment.known and DeathsTorment:Stack() > 9)
+	) then
 		UseCooldown(ShadowCrash)
 	end
 	if ShadowWordPain:Usable() and DeathsTorment.known and DeathsTorment:Stack() > 9 and (not self.holding_crash or not ShadowCrash.known) then
 		return ShadowWordPain
 	end
-	if InescapableTorment.known and ShadowWordDeath:Usable() and self.dots_up and Player.fiend_up and Player.set_bonus.t31 < 2 and ((not InsidiousIre.known and not IdolOfYoggSaron.known) or (Deathspeaker.known and Deathspeaker:Up())) then
+	if InescapableTorment.known and ShadowWordDeath:Usable() and self.dots_up and Player.fiend_up and Player.set_bonus.t31 < 2 and (
+		(not (InsidiousIre.known or IdolOfYoggSaron.known)) or
+		(Deathspeaker.known and Deathspeaker:Up())
+	) then
 		return ShadowWordDeath
 	end
-	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie >= 12 and (not WhisperingShadows.known or self.holding_crash or (ShadowCrash:Cooldown() >= VampiricTouch:Remains() and not ShadowCrash:InFlight())) then
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie >= (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 3)) and (
+		not WhisperingShadows.known or
+		self.holding_crash or
+		(ShadowCrash:Cooldown() >= VampiricTouch:Remains() and not ShadowCrash:InFlight())
+	) then
 		return VampiricTouch
 	end
 	if MindBlast:Usable() and (MindDevourer:Down() or (VoidEruption.known and VoidEruption:Ready())) then
 		return MindBlast
 	end
 	if VoidTorrent:Usable() and not self.holding_crash then
+		Player.channel.interrupt_if = self.channel_interrupt[2]
 		UseCooldown(VoidTorrent)
 	end
 	return self:filler()
@@ -2676,6 +2779,7 @@ actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mi
 actions.filler+=/mindgames,target_if=max:dot.devouring_plague.remains
 actions.filler+=/shadow_word_death,target_if=min:target.time_to_die,if=talent.inescapable_torment&pet.fiend.active
 actions.filler+=/halo,if=spell_targets>1
+actions.filler+=/divine_star,if=spell_targets>1
 actions.filler+=/mind_spike,target_if=max:dot.devouring_plague.remains
 actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2
 actions.filler+=/divine_star
@@ -2698,6 +2802,7 @@ actions.filler+=/shadow_word_pain,target_if=min:remains,if=!set_bonus.tier31_4pc
 		return MindSpikeInsanity
 	end
 	if MindFlayInsanity:Usable() then
+		Player.channel.interrupt_if = nil
 		return MindFlayInsanity
 	end
 	if Mindgames:Usable() then
@@ -2707,7 +2812,10 @@ actions.filler+=/shadow_word_pain,target_if=min:remains,if=!set_bonus.tier31_4pc
 		return ShadowWordDeath
 	end
 	if Halo:Usable() and Player.enemies > 1 then
-		return Halo
+		UseCooldown(Halo)
+	end
+	if DivineStar.Shadow:Usable() and Player.enemies > 1 then
+		UseCooldown(DivineStar.Shadow)
 	end
 	if MindSpike:Usable() then
 		return MindSpike
@@ -2717,7 +2825,7 @@ actions.filler+=/shadow_word_pain,target_if=min:remains,if=!set_bonus.tier31_4pc
 		return MindFlay
 	end
 	if DivineStar.Shadow:Usable() then
-		return DivineStar.Shadow
+		UseCooldown(DivineStar.Shadow)
 	end
 	if ShadowCrash:Usable() and not DeathsTorment.known then
 		UseCooldown(ShadowCrash)
@@ -2732,7 +2840,10 @@ end
 
 APL[SPEC.SHADOW].channel_interrupt = {
 	[1] = function() -- Mind Flay
-		return Player.channel.ticks >= 1
+		return Player.channel.ticks >= 2
+	end,
+	[2] = function() -- Void Torrent
+		return Player.set_bonus.t31 >= 2 and Player.fiend_up and ShadowWordDeath:Ready()
 	end,
 }
 
