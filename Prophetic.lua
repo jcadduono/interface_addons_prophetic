@@ -1538,10 +1538,6 @@ function Player:UpdateTime(timeStamp)
 end
 
 function Player:UpdateKnown()
-	self.mana.base = BaseMana[self.level]
-	self.mana.max = UnitPowerMax('player', 0)
-	self.insanity.max = UnitPowerMax('player', 13)
-
 	local node
 	local configId = C_ClassTalents.GetActiveConfigID()
 	for _, ability in next, Abilities.all do
@@ -1751,7 +1747,6 @@ function Player:Init()
 	propheticPreviousPanel.ability = nil
 	self.guid = UnitGUID('player')
 	self.name = UnitName('player')
-	self.level = UnitLevel('player')
 	_, self.instance = IsInInstance()
 	Events:GROUP_ROSTER_UPDATE()
 	Events:PLAYER_SPECIALIZATION_CHANGED('player')
@@ -3443,9 +3438,18 @@ end
 
 function Events:UNIT_HEALTH(unitId)
 	if unitId == 'player' then
-		Player.health.current = UnitHealth('player')
-		Player.health.max = UnitHealthMax('player')
+		Player.health.current = UnitHealth(unitId)
+		Player.health.max = UnitHealthMax('unitId')
 		Player.health.pct = Player.health.current / Player.health.max * 100
+	end
+end
+
+function Events:UNIT_MAXPOWER(unitId)
+	if unitId == 'player' then
+		Player.level = UnitLevel(unitId)
+		Player.mana.base = BaseMana[Player.level]
+		Player.mana.max = UnitPowerMax(unitId, 0)
+		Player.insanity.max = UnitPowerMax(unitId, 13)
 	end
 end
 
@@ -3557,6 +3561,7 @@ function Events:PLAYER_SPECIALIZATION_CHANGED(unitId)
 	Events:PLAYER_EQUIPMENT_CHANGED()
 	Events:PLAYER_REGEN_ENABLED()
 	Events:UNIT_HEALTH('player')
+	Events:UNIT_MAXPOWER('player')
 	UI.OnResourceFrameShow()
 	Target:Update()
 	Player:Update()
