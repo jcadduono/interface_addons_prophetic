@@ -1635,11 +1635,15 @@ function Player:UpdateChannelInfo()
 		return
 	end
 	local ability = Abilities.bySpellId[spellId]
-	if ability and ability == channel.ability then
-		channel.chained = true
+	if ability then
+		if ability == channel.ability then
+			channel.chained = true
+		end
+		channel.interrupt_if = ability.interrupt_if
 	else
-		channel.ability = ability
+		channel.interrupt_if = nil
 	end
+	channel.ability = ability
 	channel.ticks = 0
 	channel.start = start / 1000
 	channel.ends = ends / 1000
@@ -2470,6 +2474,13 @@ actions+=/run_action_list,name=main
 	return self:main()
 end
 
+APL[SPEC.SHADOW].precombat_variables = function(self)
+	-- default channel interrupts if casted outside window of APL recommendation
+	MindFlay.interrupt_if = self.channel_interrupt[1]
+	MindFlayInsanity.interrupt_if = self.channel_interrupt[2]
+	VoidTorrent.interrupt_if =  self.channel_interrupt[2]
+end
+
 APL[SPEC.SHADOW].aoe = function(self)
 --[[
 actions.aoe=call_action_list,name=aoe_variables
@@ -2576,7 +2587,7 @@ actions.aoe+=/call_action_list,name=filler
 				return MindSpikeInsanity
 			end
 			if MindFlayInsanity:Usable() and MindBlast:FullRechargeTime() >= (Player.gcd * 3) and (not VoidTorrent.known or not VoidTorrent:Ready()) then
-				Player.channel.interrupt_if = self.channel_interrupt[1]
+				MindFlayInsanity.interrupt_if = self.channel_interrupt[1]
 				return MindFlayInsanity
 			end
 		end
@@ -2584,7 +2595,7 @@ actions.aoe+=/call_action_list,name=filler
 			return MindBlast
 		end
 		if VoidTorrent:Usable() and (DevouringPlague:Remains() >= 2.5 or Voidform:Up()) then
-			Player.channel.interrupt_if = nil
+			VoidTorrent.interrupt_if = self.channel_interrupt[2]
 			UseCooldown(VoidTorrent)
 		end
 	end
@@ -2793,7 +2804,7 @@ actions.main+=/call_action_list,name=filler
 		return MindBlast
 	end
 	if VoidTorrent:Usable() and not self.holding_crash then
-		Player.channel.interrupt_if = self.channel_interrupt[2]
+		VoidTorrent.interrupt_if = self.channel_interrupt[2]
 		UseCooldown(VoidTorrent)
 	end
 	return self:filler()
@@ -2831,7 +2842,7 @@ actions.filler+=/shadow_word_pain,target_if=min:remains,if=!set_bonus.tier31_4pc
 		return MindSpikeInsanity
 	end
 	if MindFlayInsanity:Usable() then
-		Player.channel.interrupt_if = nil
+		MindFlayInsanity.interrupt_if = self.channel_interrupt[2]
 		return MindFlayInsanity
 	end
 	if Mindgames:Usable() then
@@ -2850,7 +2861,7 @@ actions.filler+=/shadow_word_pain,target_if=min:remains,if=!set_bonus.tier31_4pc
 		return MindSpike
 	end
 	if MindFlay:Usable() then
-		Player.channel.interrupt_if = self.channel_interrupt[1]
+		MindFlay.interrupt_if = self.channel_interrupt[1]
 		return MindFlay
 	end
 	if DivineStar.Shadow:Usable() then
@@ -2871,8 +2882,8 @@ APL[SPEC.SHADOW].channel_interrupt = {
 	[1] = function() -- Mind Flay
 		return Player.channel.ticks >= 2
 	end,
-	[2] = function() -- Void Torrent
-		return Player.set_bonus.t31 >= 2 and Player.fiend_up and ShadowWordDeath:Ready()
+	[2] = function() -- Fully channel unless SWD available in Inescapable Torment window
+		return Player.set_bonus.t31 >= 2 and InescapableTorment.known and Player.fiend_up and ShadowWordDeath:Ready()
 	end,
 }
 
