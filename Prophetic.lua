@@ -1960,6 +1960,14 @@ function MindbenderDisc:Cooldown()
 	return max(0, remains)
 end
 
+function DevouringPlague:Duration()
+	local duration = self.buff_duration
+	if DistortedReality.known then
+		duration = duration * 2
+	end
+	return duration
+end
+
 function DevouringPlague:InsanityCost()
 	if MindDevourer.known and MindDevourer:Up() then
 		return 0
