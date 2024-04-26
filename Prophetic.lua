@@ -2454,6 +2454,7 @@ actions.aoe=call_action_list,name=aoe_variables
 actions.aoe+=/vampiric_touch,target_if=refreshable&target.time_to_die>=18&(dot.vampiric_touch.ticking|!variable.dots_up),if=variable.max_vts>0&!variable.manual_vts_applied&!action.shadow_crash.in_flight|!talent.whispering_shadows
 actions.aoe+=/shadow_crash,if=!variable.holding_crash,target_if=dot.vampiric_touch.refreshable|dot.vampiric_touch.remains<=target.time_to_die&!buff.voidform.up&(raid_event.adds.in-dot.vampiric_touch.remains)<15
 actions.aoe+=/call_action_list,name=cds,if=fight_remains<30|target.time_to_die>15&(!variable.holding_crash|active_enemies>2)
+actions.aoe+=/devouring_plague,target_if=max:target.time_to_die*(!dot.devouring_plague.ticking),if=insanity.deficit<=20&target.time_to_die>3
 actions.aoe+=/mindbender,if=(dot.shadow_word_pain.ticking&variable.dots_up|action.shadow_crash.in_flight&talent.whispering_shadows)&(fight_remains<30|target.time_to_die>15)&(!talent.dark_ascension|cooldown.dark_ascension.remains<gcd.max|fight_remains<15)
 actions.aoe+=/devouring_plague,target_if=max:target.time_to_die*(!dot.devouring_plague.ticking),if=talent.distorted_reality&(active_dot.devouring_plague=0|insanity.deficit<=20)
 actions.aoe+=/shadow_word_death,target_if=max:dot.devouring_plague.remains,if=(set_bonus.tier31_4pc|pet.fiend.active&talent.inescapable_torment&set_bonus.tier31_2pc)
@@ -2491,15 +2492,21 @@ actions.aoe+=/call_action_list,name=filler
 	) then
 		self:cds()
 	end
-	if self.use_cds and Player.fiend:Usable() and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and ((ShadowWordPain:Up() and self.dots_up) or (WhisperingShadows.known and ShadowCrash:InFlight())) and (
-		Target.timeToDie < 15 or (
-			(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
-			(not VoidEruption.known or not between(VoidEruption:Cooldown(), Player.gcd, 45))
-		)
+	if DevouringPlague:Usable() and (Target.boss or Target.timeToDie > 3) and Player.insanity.deficit <= 20 then
+		return DevouringPlague
+	end
+	if Player.fiend:Usable() and ((self.dots_up and ShadowWordPain:Up()) or (WhisperingShadows.known and ShadowCrash:InFlight())) and (
+		(self.use_cds and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
+			Target.timeToDie < 15 or (
+				(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
+				(not VoidEruption.known or VoidEruption:Ready(Player.gcd))
+			)
+		)) or
+		(MindbenderShadow.known and VoidEruption.known and not VoidEruption:Ready(50))
 	) then
 		UseCooldown(Player.fiend)
 	end
-	if DistortedReality.known and DevouringPlague:Usable() and (Player.insanity.deficit <= 20 or DevouringPlague:Ticking() == 0) then
+	if DistortedReality.known and DevouringPlague:Usable() and (Target.boss or Target.timeToDie > 3) and (Player.insanity.deficit <= 20 or DevouringPlague:Ticking() == 0) then
 		return DevouringPlague
 	end
 	if ShadowWordDeath:Usable() and (
@@ -2522,7 +2529,7 @@ actions.aoe+=/call_action_list,name=filler
 	if VoidBolt:Usable() then
 		return VoidBolt
 	end
-	if DevouringPlague:Usable() and (
+	if DevouringPlague:Usable() and (Target.boss or Target.timeToDie > 3) and (
 		DistortedReality.known or
 		Player.insanity.deficit <= 20 or
 		(DevouringPlague:Remains() <= Player.gcd and not self.pool_for_cds) or
@@ -2677,8 +2684,8 @@ actions.main+=/void_bolt,if=variable.dots_up
 actions.main+=/devouring_plague,if=fight_remains<=duration+4
 actions.main+=/devouring_plague,target_if=!talent.distorted_reality|active_enemies=1|remains<=gcd.max,if=(remains<=gcd.max|remains<3&cooldown.void_torrent.up)|insanity.deficit<=20|buff.voidform.up&cooldown.void_bolt.remains>buff.voidform.remains&cooldown.void_bolt.remains<=buff.voidform.remains+2|buff.mind_devourer.up&pmultiplier<1.2
 actions.main+=/shadow_word_death,if=set_bonus.tier31_2pc
-actions.main+=/shadow_crash,if=!variable.holding_crash&(dot.vampiric_touch.refreshable|buff.deaths_torment.stack>9&set_bonus.tier31_4pc)
-actions.main+=/shadow_word_pain,if=buff.deaths_torment.stack>9&set_bonus.tier31_4pc&(!variable.holding_crash|!talent.shadow_crash)
+actions.main+=/shadow_crash,if=!variable.holding_crash&(dot.vampiric_touch.refreshable|buff.deaths_torment.stack>9&set_bonus.tier31_4pc&active_enemies>1)
+actions.main+=/shadow_word_pain,if=buff.deaths_torment.stack>9&set_bonus.tier31_4pc&(!talent.shadow_crash|active_enemies=1)
 actions.main+=/shadow_word_death,if=variable.dots_up&talent.inescapable_torment&pet.fiend.active&((!talent.insidious_ire&!talent.idol_of_yoggsaron)|buff.deathspeaker.up)&!set_bonus.tier31_2pc
 actions.main+=/vampiric_touch,target_if=min:remains,if=refreshable&target.time_to_die>=12&(cooldown.shadow_crash.remains>=dot.vampiric_touch.remains&!action.shadow_crash.in_flight|variable.holding_crash|!talent.whispering_shadows)
 actions.main+=/mind_blast,if=(!buff.mind_devourer.up|cooldown.void_eruption.up&talent.void_eruption)
@@ -2692,15 +2699,18 @@ actions.main+=/call_action_list,name=filler
 	) then
 		self:cds()
 	end
-	if self.use_cds and Player.fiend:Usable() and self.dots_up and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
-		Target.timeToDie < 15 or (
-			(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
-			(not VoidEruption.known or not between(VoidEruption:Cooldown(), Player.gcd, 45))
-		)
+	if Player.fiend:Usable() and self.dots_up and (
+		(self.use_cds and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
+			Target.timeToDie < 15 or (
+				(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
+				(not VoidEruption.known or VoidEruption:Ready(Player.gcd))
+			)
+		)) or
+		(MindbenderShadow.known and VoidEruption.known and not VoidEruption:Ready(50))
 	) then
 		UseCooldown(Player.fiend)
 	end
-	if DevouringPlague:Usable() and (DevouringPlague:Remains() <= Player.gcd or Player.insanity.deficit <= 16) then
+	if DevouringPlague:Usable() and (Target.boss or Target.timeToDie > 3) and (DevouringPlague:Remains() <= Player.gcd or Player.insanity.deficit <= 16) then
 		return DevouringPlague
 	end
 	if ShadowWordDeath:Usable() and DevouringPlague:Up() and (
@@ -2720,7 +2730,7 @@ actions.main+=/call_action_list,name=filler
 	if VoidBolt:Usable() and self.dots_up then
 		return VoidBolt
 	end
-	if DevouringPlague:Usable() and (
+	if DevouringPlague:Usable() and (Target.boss or Target.timeToDie > 3) and (
 		Player.insanity.deficit <= 20 or
 		DevouringPlague:Remains() <= Player.gcd or
 		(MindDevourer.known and MindDevourer:Up()) or
@@ -2735,11 +2745,11 @@ actions.main+=/call_action_list,name=filler
 	end
 	if ShadowCrash:Usable() and not self.holding_crash and (
 		(WhisperingShadows.known and VampiricTouch:Refreshable()) or
-		(DeathsTorment.known and DeathsTorment:Stack() > 9)
+		(DeathsTorment.known and Player.enemies > 1 and DeathsTorment:Stack() > 9)
 	) then
 		UseCooldown(ShadowCrash)
 	end
-	if ShadowWordPain:Usable() and DeathsTorment.known and DeathsTorment:Stack() > 9 and (not self.holding_crash or not ShadowCrash.known) then
+	if ShadowWordPain:Usable() and DeathsTorment.known and DeathsTorment:Stack() > 9 and (not ShadowCrash.known or Player.enemies == 1) then
 		return ShadowWordPain
 	end
 	if InescapableTorment.known and ShadowWordDeath:Usable() and self.dots_up and Player.fiend_up and Player.set_bonus.t31 < 2 and (
