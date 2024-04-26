@@ -268,26 +268,8 @@ local Player = {
 	fiend_up = false,
 }
 
--- current pet information (used only to store summoned pets for priests)
-local Pet = {}
-
--- current target information
-local Target = {
-	boss = false,
-	guid = 0,
-	health = {
-		current = 0,
-		loss_per_sec = 0,
-		max = 100,
-		pct = 100,
-		history = {},
-	},
-	hostile = false,
-	estimated_range = 30,
-}
-
 -- base mana pool max for each level
-local BaseMana = {
+Player.BaseMana = {
 	260,	270,	285,	300,	310,	--  5
 	330,	345,	360,	380,	400,	-- 10
 	430,	465,	505,	550,	595,	-- 15
@@ -302,6 +284,33 @@ local BaseMana = {
 	26265,	30850,	36235,	42565,	50000,	-- 60
 	58730,	68985,	81030,	95180,	111800,	-- 65
 	131325,	154255,	181190,	212830,	250000,	-- 70
+}
+
+-- current pet information (used only to store summoned pets for priests)
+local Pet = {}
+
+-- current target information
+local Target = {
+	boss = false,
+	health = {
+		current = 0,
+		loss_per_sec = 0,
+		max = 100,
+		pct = 100,
+		history = {},
+	},
+	hostile = false,
+	estimated_range = 30,
+}
+
+-- target dummy unit IDs (count these units as bosses)
+Target.Dummies = {
+	[194643] = true,
+	[194648] = true,
+	[198594] = true,
+	[194644] = true,
+	[194649] = true,
+	[197833] = true,
 }
 
 -- Start AoE
@@ -1785,6 +1794,7 @@ function Target:Update()
 	local guid = UnitGUID('target')
 	if not guid then
 		self.guid = nil
+		self.uid = nil
 		self.boss = false
 		self.stunnable = true
 		self.classification = 'normal'
@@ -1804,6 +1814,7 @@ function Target:Update()
 	end
 	if guid ~= self.guid then
 		self.guid = guid
+		self.uid = tonumber(guid:match('^%w+-%d+-%d+-%d+-%d+-(%d+)') or 0)
 		self:UpdateHealth(true)
 	end
 	self.boss = false
@@ -1818,6 +1829,9 @@ function Target:Update()
 	if not self.player and self.classification ~= 'minus' and self.classification ~= 'normal' then
 		self.boss = self.level >= (Player.level + 3)
 		self.stunnable = self.level < (Player.level + 2)
+	end
+	if self.Dummies[self.uid] then
+		self.boss = true
 	end
 	if self.hostile or Opt.always_on then
 		UI:UpdateCombat()
@@ -3457,7 +3471,7 @@ end
 function Events:UNIT_MAXPOWER(unitId)
 	if unitId == 'player' then
 		Player.level = UnitLevel(unitId)
-		Player.mana.base = BaseMana[Player.level]
+		Player.mana.base = Player.BaseMana[Player.level]
 		Player.mana.max = UnitPowerMax(unitId, 0)
 		Player.insanity.max = UnitPowerMax(unitId, 13)
 	end
