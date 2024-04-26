@@ -2535,7 +2535,7 @@ actions.aoe+=/call_action_list,name=filler
 				(not VoidEruption.known or VoidEruption:Ready(Player.gcd))
 			)
 		)) or
-		(MindbenderShadow.known and VoidEruption.known and not VoidEruption:Ready(50))
+		(VoidEruption.known and not VoidEruption:Ready(50))
 	) then
 		UseCooldown(Player.fiend)
 	end
@@ -2738,7 +2738,7 @@ actions.main+=/call_action_list,name=filler
 				(not VoidEruption.known or VoidEruption:Ready(Player.gcd))
 			)
 		)) or
-		(MindbenderShadow.known and VoidEruption.known and not VoidEruption:Ready(50))
+		(VoidEruption.known and not VoidEruption:Ready(50))
 	) then
 		UseCooldown(Player.fiend)
 	end
