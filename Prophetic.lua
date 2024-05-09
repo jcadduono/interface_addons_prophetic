@@ -255,6 +255,7 @@ local Player = {
 		t29 = 0, -- Draconic Hierophant's Finery
 		t30 = 0, -- The Furnace Seraph's Verdict
 		t31 = 0, -- Blessings of Lunar Communion
+		t32 = 0, -- The Furnace Seraph's Verdict (Awakened)
 	},
 	previous_gcd = {},-- list of previous GCD abilities
 	item_use_blacklist = { -- list of item IDs with on-use effects we should mark unusable
@@ -953,11 +954,16 @@ PowerWordFortitude.buff_duration = 3600
 local PowerWordShield = Ability:Add(17, true, true)
 PowerWordShield.mana_cost = 2.65
 PowerWordShield.buff_duration = 15
+local PsychicScream = Ability:Add(8122, false, true)
+PsychicScream.mana_cost = 1.2
+PsychicScream.buff_duration = 8
+PsychicScream.cooldown_duration = 45
 local Purify = Ability:Add(527, true, true)
 Purify.mana_cost = 1.3
 Purify.cooldown_duration = 8
 local Shadowfiend = Ability:Add(34433, false, true)
 Shadowfiend.cooldown_duration = 180
+Shadowfiend.summon_count = 1
 local ShadowWordPain = Ability:Add(589, false, true)
 ShadowWordPain.mana_cost = 0.3
 ShadowWordPain.buff_duration = 16
@@ -1065,6 +1071,7 @@ InescapableTorment:AutoAoe()
 local MindbenderDisc = Ability:Add(123040, false, true)
 MindbenderDisc.buff_duration = 12
 MindbenderDisc.cooldown_duration = 60
+MindbenderDisc.summon_count = 1
 local PainSuppression = Ability:Add(33206, true, true)
 PainSuppression.mana_cost = 1.6
 PainSuppression.buff_duration = 8
@@ -1156,6 +1163,7 @@ InsidiousIre.buff_duration = 12
 local MindbenderShadow = Ability:Add(200174, false, true)
 MindbenderShadow.buff_duration = 15
 MindbenderShadow.cooldown_duration = 60
+MindbenderShadow.summon_count = 1
 local MindDevourer = Ability:Add(373202, true, true, 373204)
 MindDevourer.buff_duration = 15
 local MindFlayInsanity = Ability:Add(391403, false, true)
@@ -1176,6 +1184,9 @@ MindSpikeInsanity.triggers_combat = true
 MindSpikeInsanity.buff = Ability:Add(407468, true, true)
 MindSpikeInsanity.buff.buff_duration = 15
 local Misery = Ability:Add(238558, false, true)
+local PsychicHorror = Ability:Add(64044, false, true)
+PsychicHorror.buff_duration = 4
+PsychicHorror.cooldown_duration = 45
 local PsychicLink = Ability:Add(199484, false, true, 199486)
 PsychicLink:AutoAoe()
 local ShadowCrash = Ability:Add(205385, false, true, 205386)
@@ -1236,7 +1247,6 @@ function SummonedPets:Find(guid)
 end
 
 function SummonedPets:Purge()
-	local _, pet, guid, unit
 	for _, pet in next, self.known do
 		for guid, unit in next, pet.active_units do
 			if unit.expires <= Player.time then
@@ -1259,12 +1269,17 @@ function SummonedPets:Update()
 end
 
 function SummonedPets:Count()
-	local _, pet, guid, unit
 	local count = 0
 	for _, pet in next, self.known do
 		count = count + pet:Count()
 	end
 	return count
+end
+
+function SummonedPets:Clear()
+	for _, pet in next, self.known do
+		pet:Clear()
+	end
 end
 
 function SummonedPet:Add(unitId, duration, summonSpell)
@@ -1281,7 +1296,10 @@ function SummonedPet:Add(unitId, duration, summonSpell)
 end
 
 function SummonedPet:Remains(initial)
-	local expires_max, guid, unit = 0
+	if self.summon_spell and self.summon_spell.summon_count > 0 and self.summon_spell:Casting() then
+		return self.duration
+	end
+	local expires_max = 0
 	for guid, unit in next, self.active_units do
 		if (not initial or unit.initial) and unit.expires > expires_max then
 			expires_max = unit.expires
@@ -1299,7 +1317,10 @@ function SummonedPet:Down(...)
 end
 
 function SummonedPet:Count()
-	local count, guid, unit = 0
+	local count = 0
+	if self.summon_spell and self.summon_spell:Casting() then
+		count = count + self.summon_spell.summon_count
+	end
 	for guid, unit in next, self.active_units do
 		if unit.expires - Player.time > Player.execute_remains then
 			count = count + 1
@@ -1309,7 +1330,7 @@ function SummonedPet:Count()
 end
 
 function SummonedPet:Expiring(seconds)
-	local count, guid, unit = 0
+	local count = 0
 	for guid, unit in next, self.active_units do
 		if unit.expires - Player.time <= (seconds or Player.execute_remains) then
 			count = count + 1
@@ -1321,6 +1342,7 @@ end
 function SummonedPet:AddUnit(guid)
 	local unit = {
 		guid = guid,
+		spawn = Player.time,
 		expires = Player.time + self.duration,
 	}
 	self.active_units[guid] = unit
@@ -1338,6 +1360,12 @@ function SummonedPet:ExtendAll(seconds)
 		if unit.expires > Player.time then
 			unit.expires = unit.expires + seconds
 		end
+	end
+end
+
+function SummonedPet:Clear()
+	for guid in next, self.active_units do
+		self.active_units[guid] = nil
 	end
 end
 
@@ -1417,8 +1445,12 @@ end
 -- Inventory Items
 local Healthstone = InventoryItem:Add(5512)
 -- Equipment
+local DreambinderLoomOfTheGreatCycle = InventoryItem:Add(208616)
+DreambinderLoomOfTheGreatCycle.cooldown_duration = 120
+DreambinderLoomOfTheGreatCycle.off_gcd = false
 local IridalTheEarthsMaster = InventoryItem:Add(208321)
 IridalTheEarthsMaster.cooldown_duration = 180
+IridalTheEarthsMaster.off_gcd = false
 local Trinket1 = InventoryItem:Add(0)
 local Trinket2 = InventoryItem:Add(0)
 Trinket.BelorrelosTheSuncaller = InventoryItem:Add(207172)
@@ -2080,6 +2112,11 @@ function TwilightEquilibrium.Shadow:Remains()
 	return Ability.Remains(self)
 end
 
+function PsychicScream:Usable(...)
+	return Target.stunnable and Ability.Usable(self, ...)
+end
+PsychicHorror.Usable = PsychicScream.Usable
+
 function IridalTheEarthsMaster:Usable(...)
 	return Target.health.pct < 35 and InventoryItem.Usable(self, ...)
 end
@@ -2175,6 +2212,12 @@ actions+=/halo,if=spell_targets.halo>=3
 		return Player.swp
 	end
 	if self.use_cds then
+		if IridalTheEarthsMaster:Usable() then
+			return UseCooldown(IridalTheEarthsMaster)
+		end
+		if DreambinderLoomOfTheGreatCycle:Usable() then
+			return UseCooldown(DreambinderLoomOfTheGreatCycle)
+		end
 		if Opt.trinket then
 			if Trinket.BelorrelosTheSuncaller:Usable() and Player.fiend_remains == 0 then
 				UseCooldown(Trinket.BelorrelosTheSuncaller)
@@ -2675,6 +2718,9 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 	if IridalTheEarthsMaster:Usable() then
 		return UseCooldown(IridalTheEarthsMaster)
 	end
+	if DreambinderLoomOfTheGreatCycle:Usable() then
+		return UseCooldown(DreambinderLoomOfTheGreatCycle)
+	end
 	if Opt.trinket then
 		self:trinkets()
 	end
@@ -2890,6 +2936,12 @@ APL[SPEC.SHADOW].channel_interrupt = {
 APL.Interrupt = function(self)
 	if Silence:Usable() then
 		return Silence
+	end
+	if PsychicHorror:Usable() then
+		return PsychicHorror
+	end
+	if PsychicScream:Usable() then
+		return PsychicScream
 	end
 end
 
@@ -3146,7 +3198,7 @@ function UI:Disappear()
 	Player.cd = nil
 	Player.interrupt = nil
 	Player.extra = nil
-	UI:UpdateGlows()
+	self:UpdateGlows()
 end
 
 function UI:Reset()
@@ -3484,7 +3536,7 @@ end
 function Events:UNIT_HEALTH(unitId)
 	if unitId == 'player' then
 		Player.health.current = UnitHealth(unitId)
-		Player.health.max = UnitHealthMax('unitId')
+		Player.health.max = UnitHealthMax(unitId)
 		Player.health.pct = Player.health.current / Player.health.max * 100
 	end
 end
@@ -3592,6 +3644,7 @@ function Events:PLAYER_EQUIPMENT_CHANGED()
 	Player.set_bonus.t29 = (Player:Equipped(200324) and 1 or 0) + (Player:Equipped(200326) and 1 or 0) + (Player:Equipped(200327) and 1 or 0) + (Player:Equipped(200328) and 1 or 0) + (Player:Equipped(200329) and 1 or 0)
 	Player.set_bonus.t30 = (Player:Equipped(202540) and 1 or 0) + (Player:Equipped(202541) and 1 or 0) + (Player:Equipped(202542) and 1 or 0) + (Player:Equipped(202543) and 1 or 0) + (Player:Equipped(202545) and 1 or 0)
 	Player.set_bonus.t31 = (Player:Equipped(207279) and 1 or 0) + (Player:Equipped(207280) and 1 or 0) + (Player:Equipped(207281) and 1 or 0) + (Player:Equipped(207282) and 1 or 0) + (Player:Equipped(207284) and 1 or 0)
+	Player.set_bonus.t32 = (Player:Equipped(217201) and 1 or 0) + (Player:Equipped(217202) and 1 or 0) + (Player:Equipped(217203) and 1 or 0) + (Player:Equipped(217204) and 1 or 0) + (Player:Equipped(217205) and 1 or 0)
 
 	Player:UpdateKnown()
 end
