@@ -122,7 +122,7 @@ local function InitOpts()
 		cd_ttd = 10,
 		pot = false,
 		trinket = true,
-		heal = 60,
+		heal_threshold = 60,
 		fiend = true,
 	})
 end
@@ -2182,9 +2182,9 @@ actions.precombat+=/snapshot_stats
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player.health.pct < Opt.heal or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.heal_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
-	elseif self.use_cds and Player.health.pct < Opt.heal and VampiricEmbrace:Usable() then
+	elseif self.use_cds and Player.health.pct < Opt.heal_threshold and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
 --[[
@@ -2451,9 +2451,9 @@ APL[SPEC.HOLY].Main = function(self)
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player.health.pct < Opt.heal or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.heal_threshold or Atonement:Remains() < Player.gcd) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
-	elseif self.use_cds and Player.health.pct < Opt.heal and VampiricEmbrace:Usable() then
+	elseif self.use_cds and Player.health.pct < Opt.heal_threshold and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
 end
@@ -2498,9 +2498,9 @@ actions.precombat+=/vampiric_touch,if=!talent.shadow_crash.enabled|raid_event.ad
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
-	elseif (Player.health.pct < Opt.heal or Player:UnderMeleeAttack()) and PowerWordShield:Usable() then
+	elseif (Player.health.pct < Opt.heal_threshold or Player:UnderMeleeAttack()) and PowerWordShield:Usable() then
 		UseExtra(PowerWordShield)
-	elseif self.use_cds and Player.health.pct < Opt.heal and VampiricEmbrace:Usable() then
+	elseif self.use_cds and Player.health.pct < Opt.heal_threshold and VampiricEmbrace:Usable() then
 		UseExtra(VampiricEmbrace)
 	end
 --[[
