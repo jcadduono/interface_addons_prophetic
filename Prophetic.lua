@@ -737,6 +737,10 @@ function Ability:MaxStack()
 	return self.max_stack
 end
 
+function Ability:Capped(deficit)
+	return self:Stack() >= (self:MaxStack() - (deficit or 0))
+end
+
 function Ability:ManaCost()
 	return self.mana_cost > 0 and (self.mana_cost / 100 * Player.mana.base) or 0
 end
@@ -1067,6 +1071,8 @@ Smite.mana_cost = 0.2
 Smite.triggers_combat = true
 Smite.equilibrium = 'holy'
 ------ Talents
+local CrystallineReflection = Ability:Add(373457, true, true)
+CrystallineReflection.talent_node = 82681
 local DispelMagic = Ability:Add(528, false, true)
 DispelMagic.mana_cost = 1.6
 local DivineStar = Ability:Add(110744, false, true, 122128)
@@ -1108,12 +1114,6 @@ local MindControl = Ability:Add(605, false, true)
 MindControl.mana_cost = 2
 MindControl.buff_duration = 30
 MindControl.triggers_combat = true
-local Mindgames = Ability:Add(375901, false, true)
-Mindgames.buff_duration = 5
-Mindgames.cooldown_duration = 45
-Mindgames.insanity_gain = 10
-Mindgames.triggers_combat = true
-Mindgames.equilibrium = 'shadow'
 local PowerWordLife = Ability:Add(373481, true, true)
 PowerWordLife.mana_cost = 0.5
 PowerWordLife.cooldown_duration = 30
@@ -1123,12 +1123,15 @@ Renew.buff_duration = 15
 Renew.tick_interval = 3
 Renew.hasted_ticks = true
 local Rhapsody = Ability:Add(390622, true, true, 390636)
+Rhapsody.max_stack = 20
 local ShadowWordDeath = Ability:Add(32379, false, true)
 ShadowWordDeath.mana_cost = 0.5
 ShadowWordDeath.cooldown_duration = 20
 ShadowWordDeath.insanity_gain = 4
 ShadowWordDeath.hasted_cooldown = true
 ShadowWordDeath.equilibrium = 'shadow'
+local TwistOfFate = Ability:Add(390972, true, true, 390978)
+TwistOfFate.buff_duration = 8
 local VampiricEmbrace = Ability:Add(15286, true, true)
 VampiricEmbrace.buff_duration = 15
 VampiricEmbrace.cooldown_duration = 120
@@ -1293,6 +1296,9 @@ local SurgeOfInsanity = Ability:Add(391399, false, true)
 local ThoughtHarvester = Ability:Add(406788, false, true)
 local UnfurlingDarkness = Ability:Add(341273, true, true, 341282)
 UnfurlingDarkness.buff_duration = 8
+UnfurlingDarkness.cd = Ability:Add(341291, false, true)
+UnfurlingDarkness.cd.buff_duration = 15
+UnfurlingDarkness.cd.aura_target = 'player'
 local VoidBolt = Ability:Add(205448, false, true)
 VoidBolt.cooldown_duration = 6
 VoidBolt.insanity_gain = 10
@@ -1314,7 +1320,14 @@ local WhisperingShadows = Ability:Add(406777, false, true)
 ------ Procs
 
 -- Hero talents
-
+---- Archon
+local EmpoweredSurges = Ability:Add(453799, false, true)
+local PowerSurge = Ability:Add(453109, true, true, 453112)
+PowerSurge.buff_duration = 10
+PowerSurge.Shadow = Ability:Add(453113, true, true)
+PowerSurge.Shadow.buff_duration = 10
+---- Voidweaver
+local InnerQuietus = Ability:Add(448278, false, true)
 -- Tier set bonuses
 
 -- Racials
@@ -1714,6 +1727,7 @@ function Player:UpdateKnown()
 		MindSpikeInsanity.known = SurgeOfInsanity.known
 	end
 	MindFlayInsanity.known = MindFlay.known and SurgeOfInsanity.known
+	PowerSurge.Shadow.known = PowerSurge.known and Shadowform.known
 
 	Abilities:Update()
 	SummonedPets:Update()
@@ -2110,10 +2124,7 @@ function MindBlast:CastLanded(...)
 end
 
 function MindBlast:Free()
-	if ShadowyInsight.known and ShadowyInsight:Up() then
-		return true
-	end
-	return false
+	return ShadowyInsight.known and ShadowyInsight:Up()
 end
 
 function MindFlay:Usable(...)
@@ -2124,10 +2135,7 @@ function MindFlay:Usable(...)
 end
 
 function MindFlayInsanity:Usable(...)
-	if MindFlayInsanity.buff:Down() then
-		return false
-	end
-	return Ability.Usable(self, ...)
+	return MindFlayInsanity.buff:Up() and Ability.Usable(self, ...)
 end
 
 function MindSpike:Usable(...)
@@ -2166,6 +2174,10 @@ function ShadowWordDeath:CastLanded(...)
 	Ability.CastLanded(self, ...)
 end
 
+function UnfurlingDarkness:Cooldown()
+	return self.cd:Remains()
+end
+
 function Penance:CastSuccess(...)
 	if InescapableTorment.known then
 		Pet.Mindbender:ExtendAll(1.0)
@@ -2175,7 +2187,7 @@ end
 DarkReprimand.CastSuccess = Penance.CastSuccess
 
 function TwilightEquilibrium.Holy:Remains()
-	if Player.cast.ability then
+	if self.known and Player.cast.ability then
 		if Player.cast.ability.equilibrium == 'holy' then
 			return 0
 		elseif Player.cast.ability.equilibrium == 'shadow' then
@@ -2186,7 +2198,7 @@ function TwilightEquilibrium.Holy:Remains()
 end
 
 function TwilightEquilibrium.Shadow:Remains()
-	if Player.cast.ability then
+	if self.known and Player.cast.ability then
 		if Player.cast.ability.equilibrium == 'shadow' then
 			return 0
 		elseif Player.cast.ability.equilibrium == 'holy' then
@@ -2200,6 +2212,21 @@ function PsychicScream:Usable(...)
 	return Target.stunnable and Ability.Usable(self, ...)
 end
 PsychicHorror.Usable = PsychicScream.Usable
+
+function TwistOfFate:CanTriggerOnAllyHeal()
+	return self.known and Player.health.pct < 35
+end
+
+function TwistOfFate:Remains()
+	if self.known and Target.health.pct < 35 and Player.cast.ability then
+		return self:Duration()
+	end
+	return Ability.Remains(self)
+end
+
+function PowerWordLife:Usable(...)
+	return Player.health.pct < 35 and Ability.Usable(self, ...)
+end
 
 -- End Ability Modifications
 
@@ -2258,7 +2285,7 @@ actions.precombat+=/snapshot_stats
 		(Player.fiend_remains > 5)
 	)
 	self.hold_penance = self.use_cds and InescapableTorment.known and not Player.fiend_up and Player.fiend:Ready((6 - (TrainOfThought.known and 3 or 0) - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)
-	if Player.health.pct < 35 and PowerWordLife:Usable() then
+	if PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
@@ -2344,7 +2371,7 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Halo.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(Halo.Shadow)
 	end
-	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= (20 - Player.enemies) then
+	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Capped(Player.enemies) then
 		UseCooldown(HolyNova)
 	end
 	if Player.swp:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and Player.swp:Remains() < 10 and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
@@ -2361,9 +2388,6 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	end
 	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
-	end
-	if Mindgames:Usable() and Target.timeToDie > 6 and (not ShadowCovenant.known or not Player.fiend:Ready(Player.gcd * 4)) then
-		UseCooldown(Mindgames)
 	end
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
@@ -2386,7 +2410,7 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(12 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Stack() >= (20 - Player.enemies))) then
+	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Capped(Player.enemies))) then
 		UseCooldown(HolyNova)
 	end
 	if Penance:Usable() and not self.hold_penance then
@@ -2410,7 +2434,7 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
 	end
-	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Stack() >= (20 - Player.enemies) then
+	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Capped(Player.enemies) then
 		UseCooldown(HolyNova)
 	end
 	if PurgeTheWicked:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and PurgeTheWicked:Remains() < 10 and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
@@ -2425,7 +2449,7 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if PurgeTheWicked:Usable() and PurgeTheWicked:Refreshable() and Target.timeToDie > (PurgeTheWicked:Remains() + (PurgeTheWicked:TickTime() * 3)) then
 		return PurgeTheWicked
 	end
-	if HolyNova:Usable() and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Stack() >= (20 - Player.enemies))) then
+	if HolyNova:Usable() and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Capped(Player.enemies))) then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
@@ -2471,9 +2495,6 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(12 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if Mindgames:Usable() and Target.timeToDie > 6 and (not Player.fiend_up or not (DarkReprimand:Ready(Player.gcd * 2) or ShadowWordDeath:Ready(Player.gcd * 2) or MindBlast:Ready(Player.gcd * 2))) then
-		UseCooldown(Mindgames)
-	end
 end
 
 APL[SPEC.DISCIPLINE].torment = function(self)
@@ -2518,7 +2539,7 @@ APL[SPEC.HOLY].Main = function(self)
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if Player.health.pct < 35 and PowerWordLife:Usable() then
+	if PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
@@ -2565,7 +2586,7 @@ actions.precombat+=/vampiric_touch,if=!talent.shadow_crash.enabled|raid_event.ad
 			UseExtra(PowerWordFortitude)
 		end
 	end
-	if Player.health.pct < 35 and PowerWordLife:Usable() then
+	if PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
 		UseExtra(DesperatePrayer)
@@ -2727,20 +2748,18 @@ end
 
 APL[SPEC.SHADOW].cds = function(self)
 --[[
-actions.cds=potion,if=buff.voidform.up|buff.power_infusion.up|buff.dark_ascension.up&(fight_remains<=cooldown.power_infusion.remains+15)|fight_remains<=30
+actions.cds=potion,if=(buff.voidform.up|buff.power_infusion.up|buff.dark_ascension.up&(fight_remains<=cooldown.power_infusion.remains+15))&(fight_remains>=320|time_to_bloodlust>=320|buff.bloodlust.react)|fight_remains<=30
 actions.cds+=/fireblood,if=buff.power_infusion.up|fight_remains<=8
 actions.cds+=/berserking,if=buff.power_infusion.up|fight_remains<=12
 actions.cds+=/blood_fury,if=buff.power_infusion.up|fight_remains<=15
 actions.cds+=/ancestral_call,if=buff.power_infusion.up|fight_remains<=15
-actions.cds+=/power_infusion,if=(buff.voidform.up|buff.dark_ascension.up)
-# Use <a href='https://www.wowhead.com/spell=10060/power-infusion'>Power Infusion</a> while <a href='https://www.wowhead.com/spell=194249/voidform'>Voidform</a> or <a href='https://www.wowhead.com/spell=391109/dark-ascension'>Dark Ascension</a> is active. Chain directly after your own <a href='https://www.wowhead.com/spell=10060/power-infusion'>Power Infusion</a>.
+actions.cds+=/power_infusion,if=(buff.voidform.up|buff.dark_ascension.up&(fight_remains<=80|fight_remains>=140)|active_allied_augmentations)
 actions.cds+=/invoke_external_buff,name=power_infusion,if=(buff.voidform.up|buff.dark_ascension.up)&!buff.power_infusion.up
-# Make sure Mindbender is active before popping Void Eruption and dump charges of Mind Blast before casting
-actions.cds+=/void_eruption,if=!cooldown.fiend.up&(pet.fiend.active&cooldown.fiend.remains>=4|!talent.mindbender|active_enemies>2&!talent.inescapable_torment.rank)&(cooldown.mind_blast.charges=0|time>15)
-# Make sure Mindbender is active before popping Dark Ascension unless you have insignificant talent points or too many targets
-actions.cds+=/dark_ascension,if=pet.fiend.active&cooldown.fiend.remains>=4|!talent.mindbender&!cooldown.fiend.up|active_enemies>2&!talent.inescapable_torment
+actions.cds+=/invoke_external_buff,name=bloodlust,if=buff.power_infusion.up&fight_remains<120|fight_remains<=40
+actions.cds+=/halo,if=talent.power_surge&(pet.fiend.active&cooldown.fiend.remains>=4&talent.mindbender|!talent.mindbender&!cooldown.fiend.up|active_enemies>2&!talent.inescapable_torment|!talent.dark_ascension)&(cooldown.mind_blast.charges=0|!talent.void_eruption|cooldown.void_eruption.remains>=gcd.max*4)
+actions.cds+=/void_eruption,if=(pet.fiend.active&cooldown.fiend.remains>=4|!talent.mindbender&!cooldown.fiend.up|active_enemies>2&!talent.inescapable_torment)&(cooldown.mind_blast.charges=0|time>15)
+actions.cds+=/dark_ascension,if=(pet.fiend.active&cooldown.fiend.remains>=4|!talent.mindbender&!cooldown.fiend.up|active_enemies>2&!talent.inescapable_torment)&(active_dot.devouring_plague>=1|insanity>=(15+5*!talent.minds_eye+5*talent.distorted_reality-pet.fiend.active*6))
 actions.cds+=/call_action_list,name=trinkets
-# Use Desperate Prayer to heal up should Shadow Word: Death or other damage bring you below 75%
 actions.cds+=/desperate_prayer,if=health.pct<=75
 ]]
 	if PowerInfusion:Usable() and (
@@ -2751,17 +2770,30 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 	) then
 		return UseCooldown(PowerInfusion)
 	end
-	if VoidEruption:Usable() and (MindBlast:Charges() == 0 or Player:TimeInCombat() > 15) and not Player.fiend:Ready() and (
-		(Player.fiend_up and not Player.fiend:Ready(4)) or
-		not MindbenderShadow.known or
-		(Player.enemies > 2 and not InescapableTorment.known)
-	) then
-		return UseCooldown(VoidEruption)
-	end
-	if DarkAscension:Usable() and (
+	self.cd_condition = (
 		(Player.fiend_up and not Player.fiend:Ready(4)) or
 		(not MindbenderShadow.known and not Player.fiend:Ready()) or
 		(Player.enemies > 2 and not InescapableTorment.known)
+	)
+	if PowerSurge.known and Halo.Shadow:Usable() and (
+		not DarkAscension.known or
+		self.cd_condition
+	) and (
+		not VoidEruption.known or
+		MindBlast:Charges() == 0 or
+		not VoidEruption:Ready(Player.gcd * 4)
+	) then
+		return UseCooldown(Halo.Shadow)
+	end
+	if self.cd_condition and VoidEruption:Usable() and not Player.fiend:Ready() and (
+		MindBlast:Charges() == 0 or
+		Player:TimeInCombat() > 15
+	) then
+		return UseCooldown(VoidEruption)
+	end
+	if self.cd_condition and DarkAscension:Usable() and (
+		DevouringPlague:Ticking() >= 1 or
+		Player.insanity.current >= (15 + (MindsEye.known and 0 or 5) + (DistortedReality.known and 5 or 0) - (Player.fiend_up and 6 or 0))
 	) then
 		return UseCooldown(DarkAscension)
 	end
@@ -2871,58 +2903,83 @@ actions.main+=/call_action_list,name=filler
 	return self:filler()
 end
 
-APL[SPEC.SHADOW].filler = function(self)
+APL[SPEC.SHADOW].empowered_filler = function(self)
 --[[
-actions.filler=vampiric_touch,target_if=min:remains,if=buff.unfurling_darkness.up
-actions.filler+=/shadow_word_death,target_if=target.health.pct<20|buff.deathspeaker.up&dot.devouring_plague.ticking
-actions.filler+=/mind_spike_insanity,target_if=max:dot.devouring_plague.remains,if=dot.devouring_plague.remains>cast_time
-actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mind_flay_insanity.up
-actions.filler+=/mindgames,target_if=max:dot.devouring_plague.remains
-actions.filler+=/shadow_word_death,target_if=min:target.time_to_die,if=talent.inescapable_torment&pet.fiend.active
-actions.filler+=/halo,if=spell_targets>1
-actions.filler+=/divine_star,if=spell_targets>1
-actions.filler+=/mind_spike,target_if=max:dot.devouring_plague.remains
-actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2
-actions.filler+=/divine_star
-actions.filler+=/shadow_crash,if=raid_event.adds.in>20&
-actions.filler+=/shadow_word_death,target_if=target.health.pct<20
-actions.filler+=/shadow_word_death,target_if=max:dot.devouring_plague.remains
-actions.filler+=/shadow_word_pain,target_if=min:remains
+actions.empowered_filler=mind_spike_insanity,target_if=max:dot.devouring_plague.remains
+actions.empowered_filler+=/mind_flay_insanity,target_if=max:dot.devouring_plague.remains
 ]]
-	if UnfurlingDarkness.knwon and VampiricTouch:Usable() and UnfurlingDarkness:Up() then
-		return VampiricTouch
-	end
-	if ShadowWordDeath:Usable() and (
-		Target.health.pct < 20 or
-		(Deathspeaker.known and Deathspeaker:Up() and DevouringPlague:Up())
-	) then
-		return ShadowWordDeath
-	end
-	if MindSpikeInsanity:Usable() and DevouringPlague:Remains() > MindSpikeInsanity:CastTime() then
+	if MindSpikeInsanity:Usable() then
 		return MindSpikeInsanity
 	end
 	if MindFlayInsanity:Usable() then
 		MindFlayInsanity.interrupt_if = nil
 		return MindFlayInsanity
 	end
-	if Mindgames:Usable() then
-		return Mindgames
+end
+
+APL[SPEC.SHADOW].filler = function(self)
+--[[
+actions.filler=call_action_list,name=heal_for_tof,if=!buff.twist_of_fate.up&buff.twist_of_fate_can_trigger_on_ally_heal.up&(talent.rhapsody|talent.divine_star|talent.halo)
+actions.filler+=/power_word_shield,if=!buff.twist_of_fate.up&buff.twist_of_fate_can_trigger_on_ally_heal.up&talent.crystalline_reflection
+actions.filler+=/call_action_list,name=empowered_filler,if=dot.devouring_plague.remains>action.mind_spike.cast_time|!talent.mind_spike
+actions.filler+=/vampiric_touch,target_if=min:remains,if=talent.unfurling_darkness&buff.unfurling_darkness_cd.remains<execute_time&talent.inner_quietus
+actions.filler+=/shadow_word_death,target_if=target.health.pct<20|buff.deathspeaker.up&dot.devouring_plague.ticking
+actions.filler+=/shadow_word_death,target_if=min:target.time_to_die,if=talent.inescapable_torment&pet.fiend.active
+actions.filler+=/devouring_plague,if=talent.empowered_surges&buff.surge_of_insanity.up|buff.voidform.up&talent.void_eruption
+actions.filler+=/vampiric_touch,target_if=min:remains,if=talent.unfurling_darkness&buff.unfurling_darkness_cd.remains<execute_time
+actions.filler+=/halo,if=spell_targets>1
+actions.filler+=/power_word_life,if=!buff.twist_of_fate.up&buff.twist_of_fate_can_trigger_on_ally_heal.up
+actions.filler+=/call_action_list,name=empowered_filler
+actions.filler+=/mind_spike,target_if=max:dot.devouring_plague.remains
+actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2,interrupt_global=1
+actions.filler+=/divine_star
+actions.filler+=/shadow_crash,if=raid_event.adds.in>20
+actions.filler+=/shadow_word_death,target_if=target.health.pct<20
+actions.filler+=/shadow_word_death,target_if=max:dot.devouring_plague.remains
+actions.filler+=/shadow_word_pain,target_if=min:remains
+]]
+	if TwistOfFate.known and TwistOfFate:Down() and TwistOfFate:CanTriggerOnAllyHeal() then
+		self:heal_for_tof()
 	end
-	if InescapableTorment.known and ShadowWordDeath:Usable() and Player.fiend_up then
+	if not MindSpike.known or DevouringPlague:Remains() > MindSpike:CastTime() then
+		local apl = self:empowered_filler()
+		if apl then return apl end
+	end
+	if UnfurlingDarkness.known and InnerQuietus.known and VampiricTouch:Usable() and UnfurlingDarkness:Ready(VampiricTouch:CastTime()) then
+		return VampiricTouch
+	end
+	if ShadowWordDeath:Usable() and (
+		Target.health.pct < 20 or
+		(Deathspeaker.known and Deathspeaker:Up() and DevouringPlague:Up()) or
+		(InescapableTorment.known and Player.fiend_up)
+	) then
 		return ShadowWordDeath
 	end
-	if Halo:Usable() and Player.enemies > 1 then
-		UseCooldown(Halo)
+	if DevouringPlague:Usable() and (
+		(EmpoweredSurges.known and SurgeOfInsanity:Up()) or
+		(VoidEruption.known and Voidform:Up())
+	) then
+		return DevouringPlague
 	end
-	if DivineStar.Shadow:Usable() and Player.enemies > 1 then
-		UseCooldown(DivineStar.Shadow)
+	if UnfurlingDarkness.known and VampiricTouch:Usable() and UnfurlingDarkness:Ready(VampiricTouch:CastTime()) then
+		return VampiricTouch
 	end
-	if MindSpike:Usable() then
-		return MindSpike
+	if Halo.Shadow:Usable() and Player.enemies > 1 then
+		UseCooldown(Halo.Shadow)
 	end
-	if MindFlay:Usable() then
-		MindFlay.interrupt_if = self.channel_interrupt[1]
-		return MindFlay
+	if TwistOfFate.known and PowerWordLife:Usable() and TwistOfFate:Down() and TwistOfFate:CanTriggerOnAllyHeal() then
+		UseExtra(PowerWordLife)
+	end
+	local apl = self:empowered_filler()
+	if apl then return apl end
+	if not Player.moving then
+		if MindSpike:Usable() then
+			return MindSpike
+		end
+		if MindFlay:Usable() then
+			MindFlay.interrupt_if = self.channel_interrupt[1]
+			return MindFlay
+		end
 	end
 	if DivineStar.Shadow:Usable() then
 		UseCooldown(DivineStar.Shadow)
@@ -2935,6 +2992,30 @@ actions.filler+=/shadow_word_pain,target_if=min:remains
 	end
 	if ShadowWordPain:Usable() then
 		return ShadowWordPain
+	end
+	if MindSpike:Usable() then
+		return MindSpike
+	end
+	if MindFlay:Usable() then
+		MindFlay.interrupt_if = self.channel_interrupt[1]
+		return MindFlay
+	end
+end
+
+APL[SPEC.SHADOW].heal_for_tof = function(self)
+--[[
+actions.heal_for_tof=halo
+actions.heal_for_tof+=/divine_star
+actions.heal_for_tof+=/holy_nova,if=buff.rhapsody.stack=20&talent.rhapsody
+]]
+	if Halo.Shadow:Usable() then
+		UseExtra(Halo.Shadow)
+	elseif DivineStar.Shadow:Usable() then
+		UseExtra(DivineStar.Shadow)
+	elseif Rhapsody.known and HolyNova:Usable() and Rhapsody:Capped() then
+		UseExtra(HolyNova)
+	elseif CrystallineReflection.known and PowerWordShield:Usable() then
+		UseExtra(PowerWordShield)
 	end
 end
 
