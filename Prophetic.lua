@@ -1327,7 +1327,27 @@ PowerSurge.buff_duration = 10
 PowerSurge.Shadow = Ability:Add(453113, true, true)
 PowerSurge.Shadow.buff_duration = 10
 ---- Voidweaver
+local DarkeningHorizon = Ability:Add(449912, true, true)
+DarkeningHorizon.max_stack = 3
+local EntropicRift = Ability:Add(450193, true, true)
+EntropicRift.buff_duration = 8
+EntropicRift.learn_spellId = 447444
+EntropicRift.dot = Ability:Add(447448, false, true)
+EntropicRift.dot:AutoAoe()
 local InnerQuietus = Ability:Add(448278, false, true)
+local VoidBlast = Ability:Add(450215, false, true)
+VoidBlast.mana_cost = 0.2
+VoidBlast.triggers_combat = true
+VoidBlast.equilibrium = 'shadow'
+VoidBlast.learn_spellId = 450405
+local VoidEmpowerment = Ability:Add(450138, true, true)
+VoidEmpowerment.buff = Ability:Add(450150, true, true)
+VoidEmpowerment.buff.buff_duration = 15
+local VoidInfusion = Ability:Add(450612, true, true)
+local Voidwraith = Ability:Add(451235, true, true)
+Voidwraith.cooldown_duration = 120
+Voidwraith.buff_duration = 15
+Voidwraith.learn_spellId = 451234
 -- Tier set bonuses
 
 -- Racials
@@ -1472,7 +1492,9 @@ end
 -- Summoned Pets
 Pet.Lightspawn = SummonedPet:Add(128140, 15, Lightspawn)
 Pet.Shadowfiend = SummonedPet:Add(19668, 15, Shadowfiend)
-Pet.Mindbender = SummonedPet:Add(62982)
+Pet.Mindbender = SummonedPet:Add(62982, 15, Mindbender)
+Pet.Voidwraith = SummonedPet:Add(224466, 15, Voidwraith)
+Pet.EntropicRift = SummonedPet:Add(223273, 8, EntropicRift)
 
 -- End Summoned Pets
 
@@ -1703,7 +1725,9 @@ function Player:UpdateKnown()
 		self.swp = PurgeTheWicked
 	end
 	self.fiend = Shadowfiend
-	if MindbenderDisc.known then
+	if Voidwraith.known then
+		self.fiend = Voidwraith
+	elseif MindbenderDisc.known then
 		self.fiend = MindbenderDisc
 		Pet.Mindbender.duration = self.fiend.buff_duration
 		Pet.Mindbender.summon_spell = self.fiend
@@ -2086,12 +2110,28 @@ function MindbenderDisc:Remains()
 end
 MindbenderShadow.Remains = MindbenderDisc.Remains
 
+function Voidwraith:Remains()
+	return Pet.Voidwraith:Remains()
+end
+
 function MindbenderDisc:Cooldown()
 	local remains = Ability.Cooldown(self)
-	if VoidSummoner.known and (Smite:Casting() or MindBlast:Casting()) then
+	if VoidSummoner.known and (Smite:Casting() or MindBlast:Casting() or VoidBlast:Casting()) then
 		remains = remains - 2
 	end
 	return max(0, remains)
+end
+Voidwraith.Cooldown = MindbenderDisc.Cooldown
+
+function VoidBlast:Usable(...)
+	return Ability.Usable(self,  ...) and Pet.EntropicRift:Up()
+end
+
+function Smite:Usable(...)
+	if VoidBlast.known and Pet.EntropicRift:Up() then
+		return false
+	end
+	return Ability.Usable(self, ...)
 end
 
 function DevouringPlague:Duration()
@@ -2116,9 +2156,19 @@ function DevouringPlague:InsanityCost()
 	return max(0, cost)
 end
 
+function InescapableTorment:Activate()
+	if Voidwraith.known then
+		Pet.Voidwraith:ExtendAll(0.7)
+	elseif MindbenderShadow.known then
+		Pet.Mindbender:ExtendAll(0.7)
+	else
+		Pet.Shadowfiend:ExtendAll(1.0)
+	end
+end
+
 function MindBlast:CastLanded(...)
 	if InescapableTorment.known then
-		Pet.Mindbender:ExtendAll(MindbenderShadow.known and 0.7 or 1.0)
+		InescapableTorment:Activate()
 	end
 	Ability.CastLanded(self, ...)
 end
@@ -2169,7 +2219,7 @@ end
 
 function ShadowWordDeath:CastLanded(...)
 	if InescapableTorment.known then
-		Pet.Mindbender:ExtendAll(MindbenderShadow.known and 0.7 or 1.0)
+		InescapableTorment:Activate()
 	end
 	Ability.CastLanded(self, ...)
 end
@@ -2180,7 +2230,7 @@ end
 
 function Penance:CastSuccess(...)
 	if InescapableTorment.known then
-		Pet.Mindbender:ExtendAll(1.0)
+		InescapableTorment:Activate()
 	end
 	Ability.CastSuccess(self, ...)
 end
@@ -2228,6 +2278,18 @@ function PowerWordLife:Usable(...)
 	return Player.health.pct < 35 and Ability.Usable(self, ...)
 end
 
+function VoidBlast:CastLanded(...)
+	if DarkeningHorizon.known then
+		for guid, unit in next, Pet.EntropicRift.active_units do
+			if unit.expires > Player.time and unit.vb_extensions < DarkeningHorizon:MaxStack() then
+				unit.expires = unit.expires + 1.0
+				unit.vb_extensions = unit.vb_extensions + 1
+			end
+		end
+	end
+	Ability.CastLanded(self, ...)
+end
+
 -- End Ability Modifications
 
 -- Start Summoned Pet Modifications
@@ -2236,6 +2298,13 @@ function Pet.Mindbender:CastLanded(unit, spellId, dstGUID, event, missType)
 	if Opt.auto_aoe and InescapableTorment:Match(spellId) then
 		InescapableTorment:RecordTargetHit(dstGUID, event, missType)
 	end
+end
+Pet.Voidwraith.CastLanded = Pet.Mindbender.CastLanded
+
+function Pet.EntropicRift:AddUnit(...)
+	local pet = SummonedPet.AddUnit(self, ...)
+	pet.vb_extensions = 0
+	return pet
 end
 
 -- End Summoned Pet Modifications
@@ -2371,7 +2440,7 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Halo.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(Halo.Shadow)
 	end
-	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Capped(Player.enemies) then
+	if Rhapsody.known and HolyNova:Usable() and (not VoidBlast.known or Pet.EntropicRift:Down()) and Player.enemies >= 3 and Rhapsody:Capped(Player.enemies) then
 		UseCooldown(HolyNova)
 	end
 	if Player.swp:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and Player.swp:Remains() < 10 and Target.timeToDie > (Player.swp:Remains() + (Player.swp:TickTime() * 3)) then
@@ -2388,6 +2457,9 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	end
 	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
+	end
+	if VoidBlast:Usable() then
+		return VoidBlast
 	end
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
@@ -2410,11 +2482,14 @@ APL[SPEC.DISCIPLINE].filler = function(self)
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(12 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Capped(Player.enemies))) then
+	if HolyNova:Usable() and not (TwilightEquilibrium.known and Rhapsody.known) and (not VoidBlast.known or Pet.EntropicRift:Down()) and ((Player.enemies >= 3 and not VoidSummoner.known) or (Rhapsody.known and Rhapsody:Capped(Player.enemies))) then
 		UseCooldown(HolyNova)
 	end
 	if Penance:Usable() and not self.hold_penance then
 		return Penance
+	end
+	if VoidBlast:Usable() then
+		return VoidBlast
 	end
 	if Smite:Usable() then
 		return Smite
@@ -2482,6 +2557,9 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	end
 	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
 		return ShadowWordDeath
+	end
+	if VoidBlast:Usable() then
+		return VoidBlast
 	end
 	if DivineStar.Shadow:Usable() then
 		UseCooldown(DivineStar.Shadow)
@@ -2734,9 +2812,8 @@ APL[SPEC.SHADOW].aoe_variables = function(self)
 actions.aoe_variables=variable,name=max_vts,op=set,default=12,value=spell_targets.vampiric_touch>?12
 actions.aoe_variables+=/variable,name=is_vt_possible,op=set,value=0,default=1
 actions.aoe_variables+=/variable,name=is_vt_possible,op=set,value=1,target_if=max:(target.time_to_die*dot.vampiric_touch.refreshable),if=target.time_to_die>=18
-# TODO: Revamp to fix undesired behaviour with unstacked fights
 actions.aoe_variables+=/variable,name=dots_up,op=set,value=(active_dot.vampiric_touch+8*(action.shadow_crash.in_flight&talent.whispering_shadows))>=variable.max_vts|!variable.is_vt_possible
-actions.aoe_variables+=/variable,name=holding_crash,op=set,value=(variable.max_vts-active_dot.vampiric_touch)<4|raid_event.adds.in<10&raid_event.adds.count>(variable.max_vts-active_dot.vampiric_touch),if=variable.holding_crash&talent.whispering_shadows
+actions.aoe_variables+=/variable,name=holding_crash,op=set,value=(variable.max_vts-active_dot.vampiric_touch)<4&raid_event.adds.in>15|raid_event.adds.in<10&raid_event.adds.count>(variable.max_vts-active_dot.vampiric_touch),if=variable.holding_crash&talent.whispering_shadows&raid_event.adds.exists
 actions.aoe_variables+=/variable,name=manual_vts_applied,op=set,value=(active_dot.vampiric_touch+8*!variable.holding_crash)>=variable.max_vts|!variable.is_vt_possible
 ]]
 	self.max_vts = min(12, Player.enemies)
@@ -3371,6 +3448,12 @@ function UI:UpdateDisplay()
 			end
 		end
 		for _, unit in next, Pet.Mindbender.active_units do
+			remains = unit.expires - Player.time
+			if remains > 0 then
+				text_tr = format('%s%.1fs\n', text_tr, remains)
+			end
+		end
+		for _, unit in next, Pet.Voidwraith.active_units do
 			remains = unit.expires - Player.time
 			if remains > 0 then
 				text_tr = format('%s%.1fs\n', text_tr, remains)
@@ -4126,7 +4209,7 @@ SlashCmdList[ADDON] = function(msg, editbox)
 		if msg[2] then
 			Opt.fiend = msg[2] == 'on'
 		end
-		return Status('Show Shadowfiend/Mindbender remaining time (top right)', Opt.fiend)
+		return Status('Show Shadowfiend/Mindbender/Voidwraith remaining time (top right)', Opt.fiend)
 	end
 	if msg[1] == 'reset' then
 		UI:Reset()
@@ -4157,7 +4240,7 @@ SlashCmdList[ADDON] = function(msg, editbox)
 		'pot |cFF00C000on|r/|cFFC00000off|r - show flasks and battle potions in cooldown UI',
 		'trinket |cFF00C000on|r/|cFFC00000off|r - show on-use trinkets in cooldown UI',
 		'heal |cFFFFD000[percent]|r - health percentage threshold to recommend self healing spells (default is 60%, 0 to disable)',
-		'fiend |cFF00C000on|r/|cFFC00000off|r - show Shadowfiend/Mindbender remaining time (top right)',
+		'fiend |cFF00C000on|r/|cFFC00000off|r - show Shadowfiend/Mindbender/Voidwraith remaining time (top right)',
 		'|cFFFFD000reset|r - reset the location of the ' .. ADDON .. ' UI to default',
 	} do
 		print('  ' .. SLASH_Prophetic1 .. ' ' .. cmd)
