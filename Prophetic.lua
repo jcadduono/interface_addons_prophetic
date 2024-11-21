@@ -1017,7 +1017,8 @@ Note: To get talent_node value for a talent, hover over talent and use macro:
 ]]
 
 -- Priest Abilities
----- Multiple Specializations
+---- Class
+------ Baseline
 local DesperatePrayer = Ability:Add(19236, true, true)
 DesperatePrayer.buff_duration = 10
 DesperatePrayer.cooldown_duration = 90
@@ -1033,6 +1034,7 @@ local MindBlast = Ability:Add(8092, false, true)
 MindBlast.mana_cost = 0.25
 MindBlast.cooldown_duration = 7.5
 MindBlast.insanity_gain = 6
+MindBlast.summon_count = 1 -- Entropic Rift
 MindBlast.hasted_cooldown = true
 MindBlast.requires_charge = true
 MindBlast.triggers_combat = true
@@ -1376,7 +1378,7 @@ function SummonedPets:Update()
 	wipe(self.known)
 	wipe(self.byUnitId)
 	for _, pet in next, self.all do
-		pet.known = pet.summon_spell and pet.summon_spell.known
+		pet.known = pet.learn_spell and pet.learn_spell.known
 		if pet.known then
 			self.known[#SummonedPets.known + 1] = pet
 			self.byUnitId[pet.unitId] = pet
@@ -1398,12 +1400,13 @@ function SummonedPets:Clear()
 	end
 end
 
-function SummonedPet:Add(unitId, duration, summonSpell)
+function SummonedPet:Add(unitId, duration, summonSpell, learnSpell)
 	local pet = {
 		unitId = unitId,
 		duration = duration,
 		active_units = {},
 		summon_spell = summonSpell,
+		learn_spell = learnSpell or summonSpell,
 		known = false,
 	}
 	setmetatable(pet, self)
@@ -1494,7 +1497,7 @@ Pet.Lightspawn = SummonedPet:Add(128140, 15, Lightspawn)
 Pet.Shadowfiend = SummonedPet:Add(19668, 15, Shadowfiend)
 Pet.Mindbender = SummonedPet:Add(62982, 15, Mindbender)
 Pet.Voidwraith = SummonedPet:Add(224466, 15, Voidwraith)
-Pet.EntropicRift = SummonedPet:Add(223273, 8, EntropicRift)
+Pet.EntropicRift = SummonedPet:Add(223273, 8, MindBlast, EntropicRift)
 
 -- End Summoned Pets
 
@@ -1731,10 +1734,12 @@ function Player:UpdateKnown()
 		self.fiend = MindbenderDisc
 		Pet.Mindbender.duration = self.fiend.buff_duration
 		Pet.Mindbender.summon_spell = self.fiend
+		Pet.Mindbender.learn_spell = self.fiend
 	elseif MindbenderShadow.known then
 		self.fiend = MindbenderShadow
 		Pet.Mindbender.duration = self.fiend.buff_duration
 		Pet.Mindbender.summon_spell = self.fiend
+		Pet.Mindbender.learn_spell = self.fiend
 	elseif Lightspawn.known then
 		self.fiend = Lightspawn
 	end
