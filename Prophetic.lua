@@ -2249,12 +2249,28 @@ function PowerWordLife:Available(...)
 	return Player.health.pct < 35
 end
 
+function DarkeningHorizon:Stack()
+	local stack = self.stacks
+	if VoidBlast:Casting() then
+		stack = stack - 1
+	end
+	return max(0, stack)
+end
+
+function DarkeningHorizon:Remains()
+	local stack = self:Stack()
+	if stack == 0 then
+		return 0
+	end
+	return Pet.EntropicRift:Remains()
+end
+
 function VoidBlast:CastLanded(...)
 	if DarkeningHorizon.known then
 		for guid, unit in next, Pet.EntropicRift.active_units do
-			if unit.expires > Player.time and unit.vb_extensions < DarkeningHorizon:MaxStack() then
+			if unit.expires > Player.time and DarkeningHorizon.stacks > 0 then
 				unit.expires = unit.expires + 1.0
-				unit.vb_extensions = unit.vb_extensions + 1
+				DarkeningHorizon.stacks = DarkeningHorizon.stacks - 1
 			end
 		end
 	end
@@ -2274,7 +2290,9 @@ Pet.Voidwraith.CastLanded = Pet.Mindbender.CastLanded
 
 function Pet.EntropicRift:AddUnit(...)
 	local pet = SummonedPet.AddUnit(self, ...)
-	pet.vb_extensions = 0
+	if DarkeningHorizon.known then
+		DarkeningHorizon.stacks = DarkeningHorizon:MaxStack()
+	end
 	return pet
 end
 
@@ -2396,6 +2414,9 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.haste_factor) and DarkeningHorizon:Up() then
+		return VoidBlast
+	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
 	end
@@ -2489,6 +2510,9 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	end
 	if Penance:Usable() and not self.hold_penance then
 		return Penance
+	end
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.haste_factor) and DarkeningHorizon:Up() then
+		return VoidBlast
 	end
 	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar.Shadow)
