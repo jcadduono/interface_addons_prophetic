@@ -2438,14 +2438,25 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if self.use_cds and Player.fiend:Usable() and (not InescapableTorment.known or MindBlast:Ready(Player.gcd) or ShadowWordDeath:Ready(Player.gcd)) then
 		UseCooldown(Player.fiend)
 	end
-	if ShadowWordPain:Usable() and ShadowWordPain:Refreshable() and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
+	if Expiation.known and ShadowWordPain:Usable() and ShadowWordPain:Remains() < (3 * Expiation.rank) and Target.timeToDie > ShadowWordPain:Remains() then
 		return ShadowWordPain
 	end
-	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or Target.timeToDie < (Player.fiend:Cooldown() / 2) or not Player.fiend:Ready(14 * Player.haste_factor)) then
+	if ShadowWordDeath:Usable() and (
+		Target.health.pct < 20 or
+		Target:TimeToPct(20) > 8
+	) and (
+		not InescapableTorment.known or
+		Player.fiend_up or
+		not Player.fiend:Ready(8)
+	) and (
+		not Expiation.known or
+		ShadowWordPain:Remains() > (3 * Expiation.rank) or
+		Target.timeToDie < ShadowWordPain:Remains()
+	) then
 		return ShadowWordDeath
 	end
-	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
-		return ShadowWordDeath
+	if ShadowWordPain:Usable() and ShadowWordPain:Refreshable() and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
+		return ShadowWordPain
 	end
 	if VoidBlast:Usable() then
 		return VoidBlast
@@ -2526,10 +2537,21 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if self.use_cds and Player.fiend:Usable() and (not InescapableTorment.known or MindBlast:Ready(Player.gcd) or ShadowWordDeath:Ready(Player.gcd)) then
 		UseCooldown(Player.fiend)
 	end
-	if ShadowWordDeath:Usable() and Target.health.pct < 20 and (not InescapableTorment.known or Player.fiend_up or Target.timeToDie < (Player.fiend:Cooldown() / 2) or not Player.fiend:Ready(14 * Player.haste_factor)) then
-		return ShadowWordDeath
+	if Expiation.known and ShadowWordPain:Usable() and ShadowWordPain:Remains() < (3 * Expiation.rank) and Target.timeToDie > ShadowWordPain:Remains() then
+		return ShadowWordPain
 	end
-	if ShadowWordDeath:Usable() and Target:TimeToPct(20) > 10 and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(14 * Player.haste_factor)) then
+	if ShadowWordDeath:Usable() and (
+		Target.health.pct < 20 or
+		Target:TimeToPct(20) > 8
+	) and (
+		not InescapableTorment.known or
+		Player.fiend_up or
+		not Player.fiend:Ready(8)
+	) and (
+		not Expiation.known or
+		ShadowWordPain:Remains() > (3 * Expiation.rank) or
+		Target.timeToDie < ShadowWordPain:Remains()
+	) then
 		return ShadowWordDeath
 	end
 	if VoidBlast:Usable() then
@@ -2566,7 +2588,11 @@ actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 	end
 	if ShadowWordDeath:Usable() and (
 		Target.health.pct < 20 or
-		Target:TimeToPct(20) > (Player.fiend_remains - Player.gcd)
+		Target:TimeToPct(20) > 8
+	) and (
+		not Expiation.known or
+		ShadowWordPain:Remains() > (3 * Expiation.rank) or
+		Target.timeToDie < ShadowWordPain:Remains()
 	) then
 		return ShadowWordDeath
 	end
