@@ -1178,6 +1178,8 @@ local MindbenderDisc = Ability:Add(123040, false, true)
 MindbenderDisc.buff_duration = 12
 MindbenderDisc.cooldown_duration = 60
 MindbenderDisc.summon_count = 1
+local PainAndSuffering = Ability:Add(390689, false, true)
+PainAndSuffering.talent_node = 82578
 local PainSuppression = Ability:Add(33206, true, true)
 PainSuppression.mana_cost = 1.6
 PainSuppression.buff_duration = 8
@@ -2067,6 +2069,9 @@ function ShadowWordPain:Duration()
 	if Misery.known then
 		duration = duration + 5
 	end
+	if PainAndSuffering.known then
+		duration = duration + (2 * PainAndSuffering.rank)
+	end
 	return duration
 end
 
@@ -2342,7 +2347,10 @@ actions.precombat+=/snapshot_stats
 		(PowerInfusion.known and PowerInfusion:Remains() > 10) or
 		(Player.fiend_remains > 5)
 	)
-	self.hold_penance = self.use_cds and InescapableTorment.known and not Player.fiend_up and Player.fiend:Ready((4 - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)
+	self.hold_penance = (
+		(self.use_cds and InescapableTorment.known and not Player.fiend_up and Player.fiend:Ready((3 - (TwilightEquilibrium.known and 2 or 0)) * Player.haste_factor)) or
+		(EncroachingShadows.known and Player.enemies > 1 and ShadowWordPain:Down())
+	)
 	if PowerWordLife:Usable() then
 		UseExtra(PowerWordLife)
 	elseif Player.health.pct < 35 and DesperatePrayer:Usable() then
@@ -2369,10 +2377,6 @@ actions+=/halo,if=spell_targets.halo>=3
 	if ShadowWordDeath:Usable() and Target.timeToDie < (2 * Player.gcd) then
 		return ShadowWordDeath
 	end
-	if InescapableTorment.known and Player.fiend_up and Player.fiend_remains < (3 * Player.gcd) then
-		local apl = self:torment()
-		if apl then return apl end
-	end
 	if ShadowWordPain:Usable() and ShadowWordPain:Down() and (Target.timeToDie > (ShadowWordPain:TickTime() * 2) or (EncroachingShadows.known and Penance:Ready(Target.timeToDie))) then
 		return ShadowWordPain
 	end
@@ -2389,6 +2393,10 @@ actions+=/halo,if=spell_targets.halo>=3
 		if PowerInfusion:Usable() then
 			UseCooldown(PowerInfusion)
 		end
+	end
+	if InescapableTorment.known and Player.fiend_up then
+		local apl = self:torment()
+		if apl then return apl end
 	end
 	local apl
 	if TwilightEquilibrium.known then
@@ -2438,7 +2446,7 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if self.use_cds and Player.fiend:Usable() and (not InescapableTorment.known or MindBlast:Ready(Player.gcd) or ShadowWordDeath:Ready(Player.gcd)) then
 		UseCooldown(Player.fiend)
 	end
-	if Expiation.known and ShadowWordPain:Usable() and ShadowWordPain:Remains() < (3 * Expiation.rank) and Target.timeToDie > ShadowWordPain:Remains() then
+	if Expiation.known and ShadowWordPain:Usable() and ShadowWordPain:Remains() < (3 * Expiation.rank) and Target.timeToDie > ShadowWordPain:Remains() and (MindBlast:Ready(Player.gcd * 2) or ShadowWordDeath:Ready(Player.gcd * 2)) then
 		return ShadowWordPain
 	end
 	if ShadowWordDeath:Usable() and (
@@ -2508,6 +2516,9 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	end
 	if Smite:Usable() then
 		return Smite
+	end
+	if not Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 then
+		UseCooldown(HolyNova)
 	end
 end
 
@@ -2583,8 +2594,23 @@ actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 	if ShadowWordDeath:Usable() and Player.fiend_remains < (Player.gcd * 2) then
 		return ShadowWordDeath
 	end
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (2 * Player.haste_factor) and DarkeningHorizon:Up() then
+		return VoidBlast
+	end
+	if Expiation.known and ShadowWordPain:Usable() and ShadowWordPain:Remains() < (3 * Expiation.rank) and Target.timeToDie > ShadowWordPain:Remains() then
+		return ShadowWordPain
+	end
 	if Schism.known and MindBlast:Usable() and Schism:Down() and Player.fiend_remains > MindBlast:CastTime()  then
 		return MindBlast
+	end
+	if DarkReprimand:Usable() and not self.hold_penance then
+		return DarkReprimand
+	end
+	if Penance:Usable() and not self.hold_penance then
+		return Penance
+	end
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (4 * Player.haste_factor) and DarkeningHorizon:Up() then
+		return VoidBlast
 	end
 	if ShadowWordDeath:Usable() and (
 		Target.health.pct < 20 or
@@ -2598,12 +2624,6 @@ actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 	end
 	if MindBlast:Usable() and Player.fiend_remains > MindBlast:CastTime() then
 		return MindBlast
-	end
-	if DarkReprimand:Usable() then
-		return DarkReprimand
-	end
-	if Penance:Usable() then
-		return Penance
 	end
 end
 
