@@ -763,6 +763,10 @@ function Ability:InsanityGain()
 	return self.insanity_gain
 end
 
+function Ability:Equilibrium()
+	return self.equilibrium
+end
+
 function Ability:Free()
 	return (
 		(self.mana_cost > 0 and self:ManaCost() == 0) or
@@ -1159,7 +1163,7 @@ Penance.cooldown_duration = 9
 Penance.hasted_cooldown = true
 Penance.hasted_duration = true
 Penance.channel_fully = true
-Penance.equilibrium = 'shadow'
+Penance.equilibrium = 'holy'
 ------ Talents
 local DarkReprimand = Ability:Add(400169, false, true, 373130)
 DarkReprimand.mana_cost = 1.6
@@ -1184,6 +1188,8 @@ local PainSuppression = Ability:Add(33206, true, true)
 PainSuppression.mana_cost = 1.6
 PainSuppression.buff_duration = 8
 PainSuppression.cooldown_duration = 180
+local PowerOfTheDarkSide = Ability:Add(198068, true, true, 198069)
+PowerOfTheDarkSide.buff_duration = 30
 local PowerWordBarrier = Ability:Add(62618, true, true, 81782)
 PowerWordBarrier.mana_cost = 4
 PowerWordBarrier.buff_duration = 10
@@ -2034,6 +2040,13 @@ end
 DivineStar.Available = Penance.Available
 Halo.Available = Penance.Available
 
+function Penance:Equilibrium()
+	if PowerOfTheDarkSide.known and PowerOfTheDarkSide:Up() then
+		return 'shadow'
+	end
+	return self.equilibrium
+end
+
 function DarkReprimand:Available(...)
 	return Shadowform.known or (ShadowCovenant.known and ShadowCovenant:Up())
 end
@@ -2214,9 +2227,9 @@ DarkReprimand.CastSuccess = Penance.CastSuccess
 
 function TwilightEquilibrium.Holy:Remains()
 	if self.known and Player.cast.ability then
-		if Player.cast.ability.equilibrium == 'holy' then
+		if Player.cast.ability:Equilibrium() == 'holy' then
 			return 0
-		elseif Player.cast.ability.equilibrium == 'shadow' then
+		elseif Player.cast.ability:Equilibrium() == 'shadow' then
 			return self:Duration()
 		end
 	end
@@ -2225,9 +2238,9 @@ end
 
 function TwilightEquilibrium.Shadow:Remains()
 	if self.known and Player.cast.ability then
-		if Player.cast.ability.equilibrium == 'shadow' then
+		if Player.cast.ability:Equilibrium() == 'shadow' then
 			return 0
-		elseif Player.cast.ability.equilibrium == 'holy' then
+		elseif Player.cast.ability:Equilibrium() == 'holy' then
 			return self:Duration()
 		end
 	end
@@ -2499,6 +2512,9 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 end
 
 APL[SPEC.DISCIPLINE].te_holy = function(self)
+	if Penance:Usable() and not self.hold_penance and Penance:Equilibrium() == 'holy' then
+		return Penance
+	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
 	end
@@ -2530,7 +2546,7 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if DarkReprimand:Usable() and not self.hold_penance then
 		return DarkReprimand
 	end
-	if Penance:Usable() and not self.hold_penance then
+	if Penance:Usable() and not self.hold_penance and Penance:Equilibrium() == 'shadow' then
 		return Penance
 	end
 	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.haste_factor) and DarkeningHorizon:Up() then
