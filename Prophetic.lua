@@ -1741,9 +1741,7 @@ function Player:UpdateKnown()
 	end
 
 	self.fiend = Shadowfiend
-	if Voidwraith.known then
-		self.fiend = Voidwraith
-	elseif MindbenderDisc.known then
+	if MindbenderDisc.known then
 		self.fiend = MindbenderDisc
 		Pet.Mindbender.duration = self.fiend.buff_duration
 		Pet.Mindbender.summon_spell = self.fiend
@@ -1753,6 +1751,8 @@ function Player:UpdateKnown()
 		Pet.Mindbender.duration = self.fiend.buff_duration
 		Pet.Mindbender.summon_spell = self.fiend
 		Pet.Mindbender.learn_spell = self.fiend
+	elseif Voidwraith.known then
+		self.fiend = Voidwraith
 	elseif Lightspawn.known then
 		self.fiend = Lightspawn
 	end
@@ -2119,7 +2119,7 @@ function Lightspawn:Remains()
 end
 
 function MindbenderDisc:Remains()
-	return Pet.Mindbender:Remains()
+	return max(Pet.Voidwraith:Remains(), Pet.Mindbender:Remains())
 end
 MindbenderShadow.Remains = MindbenderDisc.Remains
 
