@@ -2437,6 +2437,14 @@ function DarkeningHorizon:Remains()
 	return Pet.EntropicRift:Remains()
 end
 
+function PowerSurge:Remains()
+	if self.known and (Halo:Casting() or Halo.Shadow:Casting()) then
+		return self:Duration()
+	end
+	return Ability.Remains(self)
+end
+PowerSurge.Shadow.Remains = PowerSurge.Remains
+
 function VoidBlast:CastLanded(...)
 	if DarkeningHorizon.known then
 		for guid, unit in next, Pet.EntropicRift.active_units do
@@ -2839,6 +2847,7 @@ end
 APL[SPEC.SHADOW].Main = function(self)
 	self.use_cds = Opt.cooldown and (
 		(Target.boss or Target.player or (not Opt.boss_only and Target.timeToDie > (Opt.cd_ttd - min(Player.enemies - 1, 6)))) or
+		(PowerSurge.known and Halo.Shadow.known and PowerSurge.Shadow:Remains() > 5) or
 		(PowerInfusion.known and PowerInfusion:Remains() > 8) or
 		(DarkAscension.known and DarkAscension:Remains() > 8) or
 		(VoidEruption.known and Voidform:Remains() > 8) or
@@ -3057,6 +3066,7 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 		(ShadowCrash.known and ShadowCrash:InFlight())
 	) and (
 		not PowerSurge.known or
+		PowerSurge.Shadow:Up() or
 		(Halo.Shadow.known and Halo.Shadow:Ready())
 	) and (
 		(self.use_cds and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
@@ -3148,7 +3158,7 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 	) then
 		return DevouringPlague
 	end
-	if Halo.Shadow:Usable() and Player.enemies > 1 then
+	if (self.use_cds or not PowerSurge.known) and Halo.Shadow:Usable() and Player.enemies > 1 then
 		UseCooldown(Halo.Shadow)
 	end
 	if TwistOfFate.known and TwistOfFate:Down() and TwistOfFate:CanTriggerOnAllyHeal() then
@@ -3187,7 +3197,7 @@ actions.heal_for_tof=halo
 actions.heal_for_tof+=/divine_star
 actions.heal_for_tof+=/holy_nova,if=buff.rhapsody.stack=20&talent.rhapsody
 ]]
-	if Halo.Shadow:Usable() then
+	if not PowerSurge.known and Halo.Shadow:Usable() then
 		UseExtra(Halo.Shadow)
 	elseif DivineStar.Shadow:Usable() then
 		UseExtra(DivineStar.Shadow)
