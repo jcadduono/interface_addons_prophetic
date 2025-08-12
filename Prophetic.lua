@@ -1264,6 +1264,7 @@ DarkAscension.cooldown_duration = 60
 DarkAscension.insanity_gain = 30
 local Deathspeaker = Ability:Add(392507, true, true, 392511)
 Deathspeaker.buff_duration = 15
+local DescendingDarkness = Ability:Add(1242666, false, true)
 local DevouringPlague = Ability:Add(335467, false, true)
 DevouringPlague.buff_duration = 6
 DevouringPlague.tick_interval = 3
@@ -1294,14 +1295,6 @@ MindFlayInsanity.hasted_ticks = true
 MindFlayInsanity.buff = Ability:Add(391401, true, true)
 MindFlayInsanity.buff.buff_duration = 15
 local MindsEye = Ability:Add(407470, false, true)
-local MindSpike = Ability:Add(73510, false, true)
-MindSpike.insanity_gain = 4
-MindSpike.triggers_combat = true
-local MindSpikeInsanity = Ability:Add(407466, false, true)
-MindSpikeInsanity.insanity_gain = 8
-MindSpikeInsanity.triggers_combat = true
-MindSpikeInsanity.buff = Ability:Add(407468, true, true)
-MindSpikeInsanity.buff.buff_duration = 15
 local Misery = Ability:Add(238558, false, true)
 local PsychicHorror = Ability:Add(64044, false, true)
 PsychicHorror.buff_duration = 4
@@ -1309,10 +1302,11 @@ PsychicHorror.cooldown_duration = 45
 local PsychicLink = Ability:Add(199484, false, true, 199486)
 PsychicLink:AutoAoe()
 local ShadowCrash = Ability:Add({205385, 457042}, false, true, 205386)
-ShadowCrash.cooldown_duration = 20
+ShadowCrash.cooldown_duration = 15
 ShadowCrash.insanity_gain = 6
 ShadowCrash.travel_delay = 1.5
 ShadowCrash.triggers_combat = true
+ShadowCrash.requires_charge = true
 ShadowCrash:AutoAoe()
 local ShadowyInsight = Ability:Add(375888, true, true, 375981)
 ShadowyInsight.buff_duration = 10
@@ -1320,13 +1314,9 @@ local Silence = Ability:Add(15487, false, true)
 Silence.cooldown_duration = 45
 Silence.buff_duration = 4
 local ShadowyApparitions = Ability:Add(341491, false, true)
+local SubservientShadows = Ability:Add(1228516, false, true)
 local SurgeOfInsanity = Ability:Add(391399, false, true)
 local ThoughtHarvester = Ability:Add(406788, false, true)
-local UnfurlingDarkness = Ability:Add(341273, true, true, 341282)
-UnfurlingDarkness.buff_duration = 8
-UnfurlingDarkness.cd = Ability:Add(341291, false, true)
-UnfurlingDarkness.cd.buff_duration = 15
-UnfurlingDarkness.cd.aura_target = 'player'
 local VoidBolt = Ability:Add(205448, false, true)
 VoidBolt.cooldown_duration = 6
 VoidBolt.insanity_gain = 10
@@ -1341,15 +1331,24 @@ local Voidform = Ability:Add(194249, true, true)
 Voidform.buff_duration = 15
 local VoidTorrent = Ability:Add(263165, true, true)
 VoidTorrent.buff_duration = 3
-VoidTorrent.cooldown_duration = 45
+VoidTorrent.cooldown_duration = 30
 VoidTorrent.tick_interval = 1
 VoidTorrent.hasted_ticks = true
-local WhisperingShadows = Ability:Add(406777, false, true)
+local VoidVolley = Ability:Add(1242173, false, true)
+VoidVolley.insanity_gain = 10
+VoidVolley.learn_spellId = 263165
+VoidVolley.triggers_combat = true
+VoidVolley.buff = Ability:Add(1242171, true, true)
+VoidVolley.buff.buff_duration = 20
+VoidVolley.damage = Ability:Add(1242189, true, true)
+VoidVolley.damage:SetVelocity(50)
+VoidVolley.damage:AutoAoe()
 ------ Procs
 
 -- Hero talents
 ---- Archon
 local EmpoweredSurges = Ability:Add(453799, false, true)
+local PerfectedForm = Ability:Add(453917, true, true)
 local PowerSurge = Ability:Add(453109, true, true, 453112)
 PowerSurge.buff_duration = 10
 PowerSurge.Shadow = Ability:Add(453113, true, true)
@@ -1926,11 +1925,13 @@ function Player:UpdateKnown()
 		Halo.Shadow.known = Halo.known
 		DarkReprimand.known = Penance.known
 	end
-	Voidform.known = VoidEruption.known
-	VoidBolt.known = VoidEruption.known
-	if MindSpike.known then
-		MindFlay.known = false
-		MindSpikeInsanity.known = SurgeOfInsanity.known
+	if VoidEruption.known then
+		Voidform.known = true
+		VoidBolt.known = true
+	end
+	if VoidVolley.known then
+		VoidVolley.buff.known = true
+		VoidVolley.damage.known = true
 	end
 	MindFlayInsanity.known = MindFlay.known and SurgeOfInsanity.known
 	PowerSurge.Shadow.known = PowerSurge.known and Shadowform.known
@@ -2219,6 +2220,14 @@ function VoidBolt:Available(...)
 	return Voidform.known and Voidform:Up()
 end
 
+function VoidVolley:Available(...)
+	return self.known and self.buff:Up()
+end
+
+function VoidTorrent:Available(...)
+	return self.known and not VoidVolley:Available()
+end
+
 function VoidBolt:CastLanded(...)
 	Ability.CastLanded(self, ...)
 	ShadowWordPain:RefreshAuraAll(3)
@@ -2251,7 +2260,7 @@ function ShadowWordPain:Duration()
 end
 
 function ShadowWordPain:Remains()
-	if Misery.known and VampiricTouch:Casting() then
+	if (Misery.known and VampiricTouch:Casting()) or (ShadowCrash.known and ShadowCrash:InFlight()) then
 		return self:Duration()
 	end
 	local remains = Ability.Remains(self)
@@ -2259,6 +2268,13 @@ function ShadowWordPain:Remains()
 		remains = remains - (3 * Expiation.rank)
 	end
 	return max(0, remains)
+end
+
+function VampiricTouch:Remains()
+	if ShadowCrash.known and ShadowCrash:InFlight() then
+		return self:Duration()
+	end
+	return Ability.Remains(self)
 end
 
 function ShadowCrash:InFlight()
@@ -2347,36 +2363,12 @@ end
 function MindFlayInsanity:Available(...)
 	return self.known and self.buff:Up()
 end
-MindSpikeInsanity.Available = MindFlayInsanity.Available
-
-function MindSpike:Available(...)
-	return not MindSpikeInsanity:Available(...)
-end
-
-function MindSpikeInsanity.buff:Stack()
-	local stack = Ability.Stack(self)
-	if MindSpikeInsanity:Casting() then
-		stack = stack - 1
-	end
-	return max(0, stack)
-end
-
-function MindSpikeInsanity.buff:Remains()
-	if self:Stack() == 0 then
-		return 0
-	end
-	return Ability.Remains(self)
-end
 
 function ShadowWordDeath:CastLanded(...)
 	if InescapableTorment.known then
 		InescapableTorment:Activate()
 	end
 	Ability.CastLanded(self, ...)
-end
-
-function UnfurlingDarkness:Cooldown()
-	return self.cd:Remains()
 end
 
 function Penance:CastSuccess(...)
@@ -2460,6 +2452,24 @@ end
 -- End Ability Modifications
 
 -- Start Summoned Pet Modifications
+
+SubservientShadows.affected = {
+	[Pet.Mindbender] = true,
+	[Pet.Lightspawn] = true,
+	[Pet.Shadowfiend] = true,
+	[Pet.Mindbender] = true,
+	[Pet.Voidwraith] = true,
+	[Pet.EntropicRift] = false,
+}
+
+SummonedPet.AddUnit_ = SummonedPet.AddUnit
+function SummonedPet:AddUnit(...)
+	local pet = SummonedPet.AddUnit_(self, ...)
+	if SubservientShadows.known and SubservientShadows.affected[self] then
+		pet.expires = pet.expires + (self:Duration() * 0.20)
+	end
+	return pet
+end
 
 function Pet.Mindbender:CastLanded(unit, spellId, dstGUID, event, missType)
 	if Opt.auto_aoe and InescapableTorment:Match(spellId) then
@@ -2836,14 +2846,20 @@ APL[SPEC.SHADOW].Main = function(self)
 	)
 	if Player:TimeInCombat() == 0 then
 --[[
-actions.precombat=flask
-actions.precombat+=/food
-actions.precombat+=/augmentation
-actions.precombat+=/snapshot_stats
+actions.precombat=snapshot_stats
 actions.precombat+=/shadowform,if=!buff.shadowform.up
+actions.precombat+=/variable,name=trinket_1_buffs,value=(trinket.1.has_buff.intellect|trinket.1.has_buff.mastery|trinket.1.has_buff.versatility|trinket.1.has_buff.haste|trinket.1.has_buff.crit|trinket.1.is.signet_of_the_priory)&(trinket.1.cooldown.duration>=20)
+actions.precombat+=/variable,name=trinket_2_buffs,value=(trinket.2.has_buff.intellect|trinket.2.has_buff.mastery|trinket.2.has_buff.versatility|trinket.2.has_buff.haste|trinket.2.has_buff.crit|trinket.2.is.signet_of_the_priory)&(trinket.2.cooldown.duration>=20)
+actions.precombat+=/variable,name=dr_force_prio,default=1,op=reset
+actions.precombat+=/variable,name=me_force_prio,default=1,op=reset
+actions.precombat+=/variable,name=max_vts,default=12,op=reset
+actions.precombat+=/variable,name=is_vt_possible,default=0,op=reset
+actions.precombat+=/use_item,name=ingenious_mana_battery
 actions.precombat+=/arcane_torrent
-actions.precombat+=/shadow_crash,if=raid_event.adds.in>=25&spell_targets.shadow_crash<=8&!fight_style.dungeonslice
-actions.precombat+=/vampiric_touch,if=!talent.shadow_crash.enabled|raid_event.adds.in<25|spell_targets.shadow_crash>8|fight_style.dungeonslice
+actions.precombat+=/use_item,name=aberrant_spellforge
+actions.precombat+=/halo,if=!fight_style.dungeonroute&!fight_style.dungeonslice&active_enemies<=4&(fight_remains>=120|active_enemies<=2)&!talent.power_surge
+actions.precombat+=/shadow_crash,if=raid_event.adds.in>=25&spell_targets.shadow_crash<=12&!fight_style.dungeonslice
+actions.precombat+=/vampiric_touch,if=!action.shadow_crash.enabled|raid_event.adds.in<25|spell_targets.shadow_crash>8|fight_style.dungeonslice
 ]]
 		if PowerWordFortitude:Usable() and PowerWordFortitude:Remains() < 300 then
 			return PowerWordFortitude
@@ -2851,10 +2867,10 @@ actions.precombat+=/vampiric_touch,if=!talent.shadow_crash.enabled|raid_event.ad
 		if Shadowform:Usable() and Shadowform:Down() then
 			return Shadowform
 		end
-		if ShadowCrash:Usable() then
+		if ShadowCrash:Usable() and not ShadowCrash:InFlight() then
 			UseCooldown(ShadowCrash)
 		end
-		if VampiricTouch:Usable() and VampiricTouch:Down() and not (ShadowCrash.known and WhisperingShadows.known and ShadowCrash:InFlight()) then
+		if VampiricTouch:Usable() and VampiricTouch:Down() and not (ShadowCrash.known and (ShadowCrash:Ready() or ShadowCrash:InFlight())) then
 			return VampiricTouch
 		end
 	else
@@ -2873,14 +2889,14 @@ actions.precombat+=/vampiric_touch,if=!talent.shadow_crash.enabled|raid_event.ad
 	end
 --[[
 actions=variable,name=holding_crash,op=set,value=raid_event.adds.in<15
-actions+=/variable,name=pool_for_cds,op=set,value=(cooldown.void_eruption.remains<=gcd.max*3&talent.void_eruption|cooldown.dark_ascension.up&talent.dark_ascension)|talent.void_torrent&talent.psychic_link&cooldown.void_torrent.remains<=4&(!raid_event.adds.exists&spell_targets.vampiric_touch>1|raid_event.adds.in<=5|raid_event.adds.remains>=6&!variable.holding_crash)&!buff.voidform.up
-actions+=/run_action_list,name=aoe,if=active_enemies>2
+actions+=/call_action_list,name=aoe,if=active_enemies>2
 actions+=/run_action_list,name=main
 ]]
 	self.holding_crash = false
-	self.pool_for_cds = self.use_cds and ((VoidEruption.known and VoidEruption:Ready(Player.gcd * 3)) or (DarkAscension.known and DarkAscension:Ready()) or (VoidTorrent.known and PsychicLink.known and VoidTorrent:Ready(4) and Voidform:Down()))
+	self.max_vts = 0
 	if Player.enemies > 2 then
-		return self:aoe()
+		local apl = self:aoe()
+		if apl then return apl end
 	end
 	return self:main()
 end
@@ -2889,135 +2905,36 @@ APL[SPEC.SHADOW].precombat_variables = function(self)
 	-- default channel interrupts if casted outside window of APL recommendation
 	MindFlay.interrupt_if = self.channel_interrupt[1]
 	MindFlayInsanity.interrupt_if = nil
-	VoidTorrent.interrupt_if =  nil
+	VoidTorrent.interrupt_if = nil
 end
 
 APL[SPEC.SHADOW].aoe = function(self)
 --[[
 actions.aoe=call_action_list,name=aoe_variables
-actions.aoe+=/vampiric_touch,target_if=refreshable&target.time_to_die>=18&(dot.vampiric_touch.ticking|!variable.dots_up),if=variable.max_vts>0&!variable.manual_vts_applied&!action.shadow_crash.in_flight|!talent.whispering_shadows
+actions.aoe+=/vampiric_touch,if=(variable.max_vts>0&!variable.manual_vts_applied&!action.shadow_crash.in_flight)&!buff.entropic_rift.up
 actions.aoe+=/shadow_crash,if=!variable.holding_crash,target_if=dot.vampiric_touch.refreshable|dot.vampiric_touch.remains<=target.time_to_die&!buff.voidform.up&(raid_event.adds.in-dot.vampiric_touch.remains)<15
-actions.aoe+=/call_action_list,name=cds,if=fight_remains<30|target.time_to_die>15&(!variable.holding_crash|active_enemies>2)
-actions.aoe+=/devouring_plague,target_if=max:target.time_to_die*(!dot.devouring_plague.ticking),if=insanity.deficit<=20
-actions.aoe+=/mindbender,if=(dot.shadow_word_pain.ticking&variable.dots_up|action.shadow_crash.in_flight&talent.whispering_shadows)&(fight_remains<30|target.time_to_die>15)&(!talent.dark_ascension|cooldown.dark_ascension.remains<gcd.max|fight_remains<15)
-actions.aoe+=/devouring_plague,target_if=max:target.time_to_die*(!dot.devouring_plague.ticking),if=talent.distorted_reality&(active_dot.devouring_plague=0|insanity.deficit<=20)
-actions.aoe+=/mind_blast,target_if=max:dot.devouring_plague.remains,if=(cooldown.mind_blast.full_recharge_time<=gcd.max+cast_time|pet.fiend.remains<=cast_time+gcd.max)&pet.fiend.active&talent.inescapable_torment&pet.fiend.remains>cast_time&active_enemies<=7&!buff.mind_devourer.up&dot.devouring_plague.remains>execute_time
-actions.aoe+=/shadow_word_death,target_if=max:dot.devouring_plague.remains,if=pet.fiend.remains<=2&pet.fiend.active&talent.inescapable_torment&active_enemies<=7
-actions.aoe+=/void_bolt,target_if=max:target.time_to_die
-actions.aoe+=/devouring_plague,target_if=max:target.time_to_die*(!dot.devouring_plague.ticking),if=talent.distorted_reality
-actions.aoe+=/devouring_plague,if=(remains<=gcd.max&!variable.pool_for_cds|insanity.deficit<=20|buff.voidform.up&cooldown.void_bolt.remains>buff.voidform.remains&cooldown.void_bolt.remains<=buff.voidform.remains+2)&!talent.distorted_reality
-actions.aoe+=/vampiric_touch,target_if=refreshable&target.time_to_die>=18&(dot.vampiric_touch.ticking|!variable.dots_up),if=variable.max_vts>0&(cooldown.shadow_crash.remains>=dot.vampiric_touch.remains|variable.holding_crash)&!action.shadow_crash.in_flight|!talent.whispering_shadows
-actions.aoe+=/shadow_word_death,target_if=max:dot.devouring_plague.remains,if=variable.dots_up&talent.inescapable_torment&pet.fiend.active&((!talent.insidious_ire&!talent.idol_of_yoggsaron)|buff.deathspeaker.up)
-actions.aoe+=/mind_spike_insanity,target_if=max:dot.devouring_plague.remains,if=variable.dots_up&cooldown.mind_blast.full_recharge_time>=gcd*3&talent.idol_of_cthun&(!cooldown.void_torrent.up|!talent.void_torrent)
-actions.aoe+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mind_flay_insanity.up&variable.dots_up&cooldown.mind_blast.full_recharge_time>=gcd*3&talent.idol_of_cthun&(!cooldown.void_torrent.up|!talent.void_torrent)
-actions.aoe+=/mind_blast,target_if=max:dot.devouring_plague.remains,if=variable.dots_up&(!buff.mind_devourer.up|cooldown.void_eruption.up&talent.void_eruption)
-actions.aoe+=/void_torrent,target_if=max:dot.devouring_plague.remains,if=(!variable.holding_crash|raid_event.adds.count%(active_dot.vampiric_touch+raid_event.adds.count)<1.5)&(dot.devouring_plague.remains>=2.5|buff.voidform.up)
-actions.aoe+=/mind_flay,target_if=max:dot.devouring_plague.remains,if=buff.mind_flay_insanity.up&talent.idol_of_cthun,interrupt_if=ticks>=2,interrupt_immediate=1
-actions.aoe+=/call_action_list,name=filler
 ]]
 	self:aoe_variables()
-	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (
-		not WhisperingShadows.known or
-		(self.max_vts > 0 and not self.manual_vts_applied and not ShadowCrash:InFlight())
-	) then
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (self.max_vts > 0 and not self.manual_vts_applied and not ShadowCrash:InFlight()) and (not EntropicRift.known or EntropicRift:Down()) then
 		return VampiricTouch
 	end
-	if ShadowCrash:Usable() and not self.holding_crash and (
-		VampiricTouch:Refreshable() or
-		(VampiricTouch:Remains() <= Target.timeToDie and Voidform:Down())
-	) then
+	if ShadowCrash:Usable() and not self.holding_crash and not ShadowCrash:InFlight() and VampiricTouch:Refreshable() and ShadowCrash:ChargesFractional() > 1.5 then
 		UseCooldown(ShadowCrash)
 	end
-	if self.use_cds and (
-		(Target.boss and Target.timeToDie < 30) or
-		(Target.timeToDie > 15 and (not self.holding_crash or Player.enemies > 2))
-	) then
-		self:cds()
-	end
-	if DevouringPlague:Usable() and Player.insanity.deficit <= 20 then
-		return DevouringPlague
-	end
-	if Player.fiend:Usable() and ((self.dots_up and ShadowWordPain:Up()) or (WhisperingShadows.known and ShadowCrash:InFlight())) and (
-		(self.use_cds and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
-			Target.timeToDie < 15 or (
-				(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
-				(not VoidEruption.known or VoidEruption:Ready(Player.gcd))
-			)
-		)) or
-		(VoidEruption.known and not VoidEruption:Ready(50))
-	) then
-		UseCooldown(Player.fiend)
-	end
-	if DistortedReality.known and DevouringPlague:Usable() and DevouringPlague:Ticking() == 0 then
-		return DevouringPlague
-	end
-	if InescapableTorment.known and Player.fiend_up and Player.enemies <= 7 then
-		if MindBlast:Usable() and MindDevourer:Down() and Player.fiend_remains > MindBlast:CastTime() and DevouringPlague:Remains() > MindBlast:CastTime() and (
-			MindBlast:FullRechargeTime() <= (MindBlast:CastTime() + Player.gcd) or
-			Player.fiend_remains <= (MindBlast:CastTime() + Player.gcd)
-		) then
-			return MindBlast
-		end
-		if ShadowWordDeath:Usable() and Player.fiend_remains <= 2 then
-			return ShadowWordDeath
-		end
-	end
-	if VoidBolt:Usable() then
-		return VoidBolt
-	end
-	if DevouringPlague:Usable() and (Target.boss or Target.timeToDie > 3) and (
-		DistortedReality.known or
-		(DevouringPlague:Remains() <= Player.gcd and not self.pool_for_cds) or
-		(VoidEruption.known and Voidform:Up() and VoidBolt:Cooldown() > Voidform:Remains() and VoidBolt:Cooldown() <= (Voidform:Remains() + 2))
-	) then
-		return DevouringPlague
-	end
-	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (
-		not WhisperingShadows.known or
-		(self.max_vts > 0 and (self.holding_crash or ShadowCrash:Cooldown() >= VampiricTouch:Remains()) and not ShadowCrash:InFlight())
-	) then
-		return VampiricTouch
-	end
-	if self.dots_up then
-		if InescapableTorment.known and ShadowWordDeath:Usable() and Player.fiend_up and (
-			(not (InsidiousIre.known or IdolOfYoggSaron.known)) or
-			(Deathspeaker.known and Deathspeaker:Up())
-		) then
-			return ShadowWordDeath
-		end
-		if IdolOfCthun.known then
-			if MindSpikeInsanity:Usable() and MindBlast:FullRechargeTime() >= (Player.gcd * 3) and (not VoidTorrent.known or not VoidTorrent:Ready()) then
-				return MindSpikeInsanity
-			end
-			if MindFlayInsanity:Usable() and MindBlast:FullRechargeTime() >= (Player.gcd * 3) and (not VoidTorrent.known or not VoidTorrent:Ready()) then
-				MindFlayInsanity.interrupt_if = self.channel_interrupt[1]
-				return MindFlayInsanity
-			end
-		end
-		if MindBlast:Usable() and (MindDevourer:Down() or (VoidEruption.known and VoidEruption:Ready())) then
-			return MindBlast
-		end
-		if VoidTorrent:Usable() and (DevouringPlague:Remains() >= 2.5 or Voidform:Up()) then
-			VoidTorrent.interrupt_if = nil
-			UseCooldown(VoidTorrent)
-		end
-	end
-	return self:filler()
 end
 
 APL[SPEC.SHADOW].aoe_variables = function(self)
 --[[
 actions.aoe_variables=variable,name=max_vts,op=set,default=12,value=spell_targets.vampiric_touch>?12
 actions.aoe_variables+=/variable,name=is_vt_possible,op=set,value=0,default=1
-actions.aoe_variables+=/variable,name=is_vt_possible,op=set,value=1,target_if=max:(target.time_to_die*dot.vampiric_touch.refreshable),if=target.time_to_die>=18
-actions.aoe_variables+=/variable,name=dots_up,op=set,value=(active_dot.vampiric_touch+8*(action.shadow_crash.in_flight&talent.whispering_shadows))>=variable.max_vts|!variable.is_vt_possible
-actions.aoe_variables+=/variable,name=holding_crash,op=set,value=(variable.max_vts-active_dot.vampiric_touch)<4&raid_event.adds.in>15|raid_event.adds.in<10&raid_event.adds.count>(variable.max_vts-active_dot.vampiric_touch),if=variable.holding_crash&talent.whispering_shadows&raid_event.adds.exists
+actions.aoe_variables+=/variable,name=is_vt_possible,op=set,value=1,if=target.time_to_die>=18
+actions.aoe_variables+=/variable,name=dots_up,op=set,value=(active_dot.vampiric_touch+8*(action.shadow_crash.in_flight&action.shadow_crash.enabled))>=variable.max_vts|!variable.is_vt_possible
+actions.aoe_variables+=/variable,name=holding_crash,op=set,value=(variable.max_vts-active_dot.vampiric_touch)<4&raid_event.adds.in>15|raid_event.adds.in<10&raid_event.adds.count>(variable.max_vts-active_dot.vampiric_touch),if=variable.holding_crash&action.shadow_crash.enabled&raid_event.adds.exists
 actions.aoe_variables+=/variable,name=manual_vts_applied,op=set,value=(active_dot.vampiric_touch+8*!variable.holding_crash)>=variable.max_vts|!variable.is_vt_possible
 ]]
 	self.max_vts = min(12, Player.enemies)
 	self.is_vt_possible = Target.timeToDie >= (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4))
-	self.dots_up = (not self.is_vt_possible) or (VampiricTouch:Ticking() + (WhisperingShadows.known and ShadowCrash:InFlight() and 8 or 0)) >= self.max_vts
-	self.holding_crash = false
+	self.dots_up = (not self.is_vt_possible) or (VampiricTouch:Ticking() + (ShadowCrash.known and ShadowCrash:InFlight() and 8 or 0)) >= self.max_vts
 	self.manual_vts_applied = (not self.is_vt_possible) or (VampiricTouch:Ticking() + (not self.holding_crash and 8 or 0)) >= self.max_vts
 end
 
@@ -3079,7 +2996,16 @@ end
 
 APL[SPEC.SHADOW].trinkets = function(self)
 --[[
-actions.trinkets+=/use_items,if=buff.voidform.up|buff.power_infusion.up|buff.dark_ascension.up|(cooldown.void_eruption.remains>10&trinket.cooldown.duration<=60)|fight_remains<20
+actions.trinkets=use_item,use_off_gcd=1,name=hyperthread_wristwraps,if=talent.void_blast&hyperthread_wristwraps.void_blast.count>=2&!cooldown.mind_blast.up|!talent.void_blast&((hyperthread_wristwraps.void_bolt.count>=1|!talent.void_eruption)&hyperthread_wristwraps.void_torrent.count>=1)
+actions.trinkets+=/use_item,use_off_gcd=1,name=aberrant_spellforge,if=gcd.remains>0&buff.aberrant_spellforge.stack<=4
+actions.trinkets+=/use_item,use_off_gcd=1,name=neural_synapse_enhancer,if=(buff.power_surge.up|buff.entropic_rift.up|variable.trinket_1_buffs|variable.trinket_2_buffs)&(buff.voidform.up|cooldown.void_eruption.remains>=40|buff.dark_ascension.up)
+actions.trinkets+=/use_item,use_off_gcd=1,name=flarendos_pilot_light,if=gcd.remains>0&(buff.voidform.up|buff.power_infusion.remains>=10|buff.dark_ascension.up)|fight_remains<20
+actions.trinkets+=/use_item,use_off_gcd=1,name=geargrinders_spare_keys,if=gcd.remains>0
+actions.trinkets+=/use_item,name=spymasters_web,if=(buff.power_infusion.remains>=10&buff.spymasters_report.stack>=36&fight_remains>240)&(buff.voidform.up|buff.dark_ascension.up|!talent.dark_ascension&!talent.void_eruption)|((buff.power_infusion.remains>=10&buff.bloodlust.up&buff.spymasters_report.stack>=10)|buff.power_infusion.remains>=10&(fight_remains<120))&(buff.voidform.up|buff.dark_ascension.up|!talent.dark_ascension&!talent.void_eruption)|(fight_remains<=20|buff.dark_ascension.up&fight_remains<=60|buff.entropic_rift.up&talent.entropic_rift&fight_remains<=30)&!buff.spymasters_web.up
+actions.trinkets+=/use_item,name=prized_gladiators_badge_of_ferocity,if=(buff.voidform.up|buff.power_infusion.remains>=10|buff.dark_ascension.up|(talent.void_eruption&cooldown.void_eruption.remains>10)|equipped.neural_synapse_enhancer&buff.entropic_rift.up)|fight_remains<20
+actions.trinkets+=/use_item,name=astral_gladiators_badge_of_ferocity,if=(buff.voidform.up|buff.power_infusion.remains>=10|buff.dark_ascension.up|(talent.void_eruption&cooldown.void_eruption.remains>10)|equipped.neural_synapse_enhancer&buff.entropic_rift.up)|fight_remains<20
+actions.trinkets+=/use_item,use_off_gcd=1,name=perfidious_projector,if=gcd.remains>0&(!talent.voidheart|buff.voidheart.up|fight_remains<20)
+actions.trinkets+=/use_items,if=(buff.voidform.up|buff.power_infusion.remains>=10|buff.dark_ascension.up|equipped.neural_synapse_enhancer&buff.entropic_rift.up)|fight_remains<20
 ]]
 	if Trinket1:Usable() and (Voidform:Up() or PowerInfusion:Up() or DarkAscension:Up() or (Target.boss and Target.timeToDie < 20)) then
 		return UseCooldown(Trinket1)
@@ -3091,30 +3017,48 @@ end
 
 APL[SPEC.SHADOW].main = function(self)
 --[[
-actions.main=variable,name=dots_up,op=set,value=active_dot.vampiric_touch=active_enemies|action.shadow_crash.in_flight&talent.whispering_shadows
+actions.main=variable,name=dots_up,op=set,value=active_dot.vampiric_touch=active_enemies|action.shadow_crash.in_flight,if=active_enemies<3
 actions.main+=/call_action_list,name=cds,if=fight_remains<30|target.time_to_die>15&(!variable.holding_crash|active_enemies>2)
-actions.main+=/mindbender,if=variable.dots_up&(fight_remains<30|target.time_to_die>15)&(!talent.dark_ascension|cooldown.dark_ascension.remains<gcd.max|fight_remains<15)
-actions.main+=/devouring_plague,target_if=!talent.distorted_reality|active_enemies=1|remains<=gcd.max,if=remains<=gcd.max|insanity.deficit<=16
-actions.main+=/mind_blast,target_if=dot.devouring_plague.remains>execute_time&(cooldown.mind_blast.full_recharge_time<=gcd.max+execute_time)|pet.fiend.remains<=execute_time+gcd.max,if=pet.fiend.active&talent.inescapable_torment&pet.fiend.remains>execute_time&active_enemies<=7
-actions.main+=/shadow_word_death,target_if=dot.devouring_plague.ticking&pet.fiend.remains<=2&pet.fiend.active&talent.inescapable_torment&active_enemies<=7
-actions.main+=/void_bolt,if=variable.dots_up
-actions.main+=/devouring_plague,if=fight_remains<=duration+4
-actions.main+=/devouring_plague,target_if=!talent.distorted_reality|active_enemies=1|remains<=gcd.max,if=(remains<=gcd.max|remains<3&cooldown.void_torrent.up)|insanity.deficit<=20|buff.voidform.up&cooldown.void_bolt.remains>buff.voidform.remains&cooldown.void_bolt.remains<=buff.voidform.remains+2|buff.mind_devourer.up&pmultiplier<1.2
-actions.main+=/shadow_crash,if=!variable.holding_crash&dot.vampiric_touch.refreshable
-actions.main+=/shadow_word_death,if=variable.dots_up&talent.inescapable_torment&pet.fiend.active&((!talent.insidious_ire&!talent.idol_of_yoggsaron)|buff.deathspeaker.up)
-actions.main+=/vampiric_touch,target_if=min:remains,if=refreshable&target.time_to_die>=12&(cooldown.shadow_crash.remains>=dot.vampiric_touch.remains&!action.shadow_crash.in_flight|variable.holding_crash|!talent.whispering_shadows)
-actions.main+=/mind_blast,if=(!buff.mind_devourer.up|cooldown.void_eruption.up&talent.void_eruption)
-actions.main+=/void_torrent,if=!variable.holding_crash,target_if=dot.devouring_plague.remains>=2.5
-actions.main+=/call_action_list,name=filler
+actions.main+=/mindbender,if=(dot.shadow_word_pain.ticking&variable.dots_up|action.shadow_crash.in_flight)&(!cooldown.halo.up|!talent.power_surge.enabled)&(fight_remains<30|target.time_to_die>15)&(!talent.dark_ascension|cooldown.dark_ascension.remains<gcd.max|fight_remains<15)
+actions.main+=/shadow_word_death,if=priest.force_devour_matter&talent.devour_matter
+actions.main+=/void_blast,if=(dot.devouring_plague.remains>=execute_time|buff.entropic_rift.remains<=gcd.max|action.void_torrent.channeling&talent.void_empowerment)&(insanity.deficit>=16|cooldown.mind_blast.full_recharge_time<=gcd.max|buff.entropic_rift.remains<=gcd.max)
+actions.main+=/devouring_plague,if=buff.voidform.up&talent.perfected_form&buff.voidform.remains<=gcd.max&talent.void_eruption
+actions.main+=/void_bolt,if=insanity.deficit>16&cooldown.void_bolt.remains%gcd.max<=0.1
+actions.main+=/devouring_plague,if=active_dot.devouring_plague<=1&dot.devouring_plague.remains<=gcd.max&(!talent.void_eruption|cooldown.void_eruption.remains>=gcd.max*3)|insanity.deficit<=35|buff.mind_devourer.up|buff.entropic_rift.up|buff.power_surge.up&buff.tww3_archon_4pc_helper.stack<4&buff.ascension.up
+actions.main+=/void_torrent,if=!variable.holding_crash&(dot.devouring_plague.remains>=2.5&(cooldown.dark_ascension.remains>=12|!talent.dark_ascension|!talent.void_blast)|cooldown.void_eruption.remains<=3&talent.void_eruption),interrupt_if=!talent.entropic_rift,interrupt_immediate=1
+actions.main+=/void_volley,if=buff.void_volley.remains<=5|buff.entropic_rift.up&action.void_blast.usable_in>buff.entropic_rift.remains|target.time_to_die<=5
+actions.main+=/mind_flay_insanity,target_if=max:dot.devouring_plague.remains
+actions.main+=/shadow_crash,if=!variable.holding_crash&!action.shadow_crash.in_flight
+actions.main+=/vampiric_touch,if=refreshable&target.time_to_die>12&(dot.vampiric_touch.ticking|!variable.dots_up)&(variable.max_vts>0|active_enemies=1)&(action.shadow_crash.usable_in>=dot.vampiric_touch.remains|variable.holding_crash|!action.shadow_crash.enabled)&(!action.shadow_crash.in_flight)
+actions.main+=/mind_blast,if=(!buff.mind_devourer.react|!talent.mind_devourer|cooldown.void_eruption.up&talent.void_eruption)
+actions.main+=/void_volley
+actions.main+=/devouring_plague,if=buff.voidform.up&talent.void_eruption|buff.power_surge.up|talent.distorted_reality
+actions.main+=/halo,if=spell_targets>1
+actions.main+=/call_action_list,name=heal_for_tof,if=!buff.twist_of_fate.up&buff.twist_of_fate_can_trigger_on_ally_heal.up&(talent.rhapsody|talent.divine_star|talent.halo)
+actions.main+=/shadow_crash,if=!variable.holding_crash&raid_event.adds.in>=30&talent.descending_darkness&raid_event.movement.in>=30
+actions.main+=/shadow_word_death,target_if=target.health.pct<(20+15*talent.deathspeaker)
+actions.main+=/shadow_word_death,if=talent.inescapable_torment&pet.fiend.active
+actions.main+=/mind_flay,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2,interrupt_global=1
+actions.main+=/divine_star
+actions.main+=/shadow_crash,if=raid_event.adds.in>20
+actions.main+=/shadow_word_death,target_if=target.health.pct<20
+actions.main+=/shadow_word_death,target_if=max:dot.devouring_plague.remains
+actions.main+=/shadow_word_pain,target_if=min:remains
 ]]
-	self.dots_up = VampiricTouch:Ticking() >= Player.enemies or (WhisperingShadows.known and ShadowCrash:InFlight())
+	self.dots_up = VampiricTouch:Ticking() >= Player.enemies or (ShadowCrash.known and ShadowCrash:InFlight())
 	if self.use_cds and (
 		(Target.boss and Target.timeToDie < 30) or
 		(Target.timeToDie > 15 and (not self.holding_crash or Player.enemies > 2))
 	) then
 		self:cds()
 	end
-	if Player.fiend:Usable() and self.dots_up and (
+	if Player.fiend:Usable() and (
+		(ShadowWordPain:Up() and self.dots_up) or
+		(ShadowCrash.known and ShadowCrash:InFlight())
+	) and (
+		not PowerSurge.known or
+		(Halo.Shadow.known and Halo.Shadow:Ready())
+	) and (
 		(self.use_cds and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
 			Target.timeToDie < 15 or (
 				(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
@@ -3125,141 +3069,108 @@ actions.main+=/call_action_list,name=filler
 	) then
 		UseCooldown(Player.fiend)
 	end
+	if VoidBlast:Usable() and (
+		EntropicRift:Remains() <= Player.gcd or
+		(
+			DevouringPlague:Remains() >= VoidBlast:CastTime() or
+			EntropicRift:Remains() <= Player.gcd or
+			(VoidEmpowerment.known and VoidTorrent:Channeling())
+		) and (
+			Player.insanity.deficit >= 16 or
+			MindBlast:FullRechargeTime() <= Player.gcd
+		)
+	) then
+		return VoidBlast
+	end
 	if DevouringPlague:Usable() and (
 		Player.insanity.deficit <= 16 or
-		((Target.boss or Target.timeToDie > 3) and DevouringPlague:Remains() <= Player.gcd)
+		(VoidEruption.known and PerfectedForm.known and Voidform:Up() and Voidform:Remains() <= Player.gcd * 2)
 	) then
 		return DevouringPlague
 	end
-	if InescapableTorment.known and Player.fiend_up and Player.enemies <= 7 then
-		if MindBlast:Usable() and Player.fiend_remains > MindBlast:CastTime() then
-			return MindBlast
-		end
-		if ShadowWordDeath:Usable() and Player.fiend_remains <= 2 and DevouringPlague:Up() then
-			return ShadowWordDeath
-		end
-	end
-	if VoidBolt:Usable() and self.dots_up then
+	if VoidBolt:Usable() and Player.insanity.deficit > 16 then
 		return VoidBolt
 	end
-	if DevouringPlague:Usable() and (Target.boss or Target.timeToDie > 3) and (
-		Player.insanity.deficit <= 20 or
-		DevouringPlague:Remains() <= Player.gcd or
+	if DevouringPlague:Usable() and Player.insanity.deficit <= 16 then
+		return DevouringPlague
+	end
+	if DevouringPlague:Usable() and DevouringPlague:Ticking() <= 1 and DevouringPlague:Remains() <= Player.gcd and (
+		not VoidEruption.known or
+		not VoidEruption:Ready(Player.gcd * 3) or
+		Player.insanity.deficit <= 35 or
 		(MindDevourer.known and MindDevourer:Up()) or
-		(Target.boss and Target.timeToDie <= (DevouringPlague:Duration() + 4)) or
-		(VoidTorrent.known and DevouringPlague:Remains() < 3 and VoidTorrent:Ready()) or
-		(VoidEruption.known and Voidform:Up() and VoidBolt:Cooldown() > Voidform:Remains() and VoidBolt:Cooldown() <= (Voidform:Remains() + 2))
+		(EntropicRift.known and EntropicRift:Up())
+		--(PowerSurge.known and PowerSurge.Shadow:Up() and Ascension:Up())
 	) then
 		return DevouringPlague
 	end
-	if WhisperingShadows.known and ShadowCrash:Usable() and not self.holding_crash and VampiricTouch:Refreshable() then
-		UseCooldown(ShadowCrash)
-	end
-	if InescapableTorment.known and ShadowWordDeath:Usable() and self.dots_up and Player.fiend_up and (
-		(not (InsidiousIre.known or IdolOfYoggSaron.known)) or
-		(Deathspeaker.known and Deathspeaker:Up())
+	if VoidTorrent:Usable() and not self.holding_crash and (
+		(DevouringPlague:Remains() >= 2.5 and (not DarkAscension.known or not VoidBlast.known or not DarkAscension:Ready(12))) or
+		(VoidEruption.known and VoidEruption:Ready(3))
 	) then
-		return ShadowWordDeath
-	end
-	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie >= (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 3)) and (
-		not WhisperingShadows.known or
-		self.holding_crash or
-		(ShadowCrash:Cooldown() >= VampiricTouch:Remains() and not ShadowCrash:InFlight())
-	) then
-		return VampiricTouch
-	end
-	if MindBlast:Usable() and (MindDevourer:Down() or (VoidEruption.known and VoidEruption:Ready())) then
-		return MindBlast
-	end
-	if VoidTorrent:Usable() and not self.holding_crash then
-		VoidTorrent.interrupt_if = nil
+		VoidTorrent.interrupt_if = self.channel_interrupt[2]
 		UseCooldown(VoidTorrent)
 	end
-	return self:filler()
-end
-
-APL[SPEC.SHADOW].empowered_filler = function(self)
---[[
-actions.empowered_filler=mind_spike_insanity,target_if=max:dot.devouring_plague.remains
-actions.empowered_filler+=/mind_flay_insanity,target_if=max:dot.devouring_plague.remains
-]]
-	if MindSpikeInsanity:Usable() then
-		return MindSpikeInsanity
+	if VoidVolley:Usable() and (
+		VoidVolley.buff:Remains() <= 5 or
+		(EntropicRift.known and EntropicRift:Up() and VoidBlast:Cooldown() < EntropicRift:Remains()) or
+		Target.timeToDie <= 5
+	) then
+		UseCooldown(VoidVolley)
 	end
 	if MindFlayInsanity:Usable() then
 		MindFlayInsanity.interrupt_if = nil
 		return MindFlayInsanity
 	end
-end
-
-APL[SPEC.SHADOW].filler = function(self)
---[[
-actions.filler=call_action_list,name=heal_for_tof,if=!buff.twist_of_fate.up&buff.twist_of_fate_can_trigger_on_ally_heal.up&(talent.rhapsody|talent.divine_star|talent.halo)
-actions.filler+=/power_word_shield,if=!buff.twist_of_fate.up&buff.twist_of_fate_can_trigger_on_ally_heal.up&talent.crystalline_reflection
-actions.filler+=/call_action_list,name=empowered_filler,if=dot.devouring_plague.remains>action.mind_spike.cast_time|!talent.mind_spike
-actions.filler+=/vampiric_touch,target_if=min:remains,if=talent.unfurling_darkness&buff.unfurling_darkness_cd.remains<execute_time&talent.inner_quietus
-actions.filler+=/shadow_word_death,target_if=target.health.pct<20|buff.deathspeaker.up&dot.devouring_plague.ticking
-actions.filler+=/shadow_word_death,target_if=min:target.time_to_die,if=talent.inescapable_torment&pet.fiend.active
-actions.filler+=/devouring_plague,if=talent.empowered_surges&buff.surge_of_insanity.up|buff.voidform.up&talent.void_eruption
-actions.filler+=/vampiric_touch,target_if=min:remains,if=talent.unfurling_darkness&buff.unfurling_darkness_cd.remains<execute_time
-actions.filler+=/halo,if=spell_targets>1
-actions.filler+=/power_word_life,if=!buff.twist_of_fate.up&buff.twist_of_fate_can_trigger_on_ally_heal.up
-actions.filler+=/call_action_list,name=empowered_filler
-actions.filler+=/mind_spike,target_if=max:dot.devouring_plague.remains
-actions.filler+=/mind_flay,target_if=max:dot.devouring_plague.remains,chain=1,interrupt_immediate=1,interrupt_if=ticks>=2,interrupt_global=1
-actions.filler+=/divine_star
-actions.filler+=/shadow_crash,if=raid_event.adds.in>20
-actions.filler+=/shadow_word_death,target_if=target.health.pct<20
-actions.filler+=/shadow_word_death,target_if=max:dot.devouring_plague.remains
-actions.filler+=/shadow_word_pain,target_if=min:remains
-]]
-	if TwistOfFate.known and TwistOfFate:Down() and TwistOfFate:CanTriggerOnAllyHeal() then
-		self:heal_for_tof()
+	if ShadowCrash:Usable() and not self.holding_crash and not ShadowCrash:InFlight() and (
+		VampiricTouch:Refreshable() or
+		ShadowCrash:ChargesFractional() > 1.8
+	) then
+		UseCooldown(ShadowCrash)
 	end
-	if not MindSpike.known or DevouringPlague:Remains() > MindSpike:CastTime() then
-		local apl = self:empowered_filler()
-		if apl then return apl end
-	end
-	if UnfurlingDarkness.known and InnerQuietus.known and VampiricTouch:Usable() and UnfurlingDarkness:Ready(VampiricTouch:CastTime()) then
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 3)) and not ShadowCrash:InFlight() and (VampiricTouch:Up() or not self.dots_up) and (self.max_vts > 0 or Player.enemies == 1) and (not ShadowCrash.known or self.holding_crash or ShadowCrash:Cooldown() > VampiricTouch:Remains()) then
 		return VampiricTouch
 	end
-	if ShadowWordDeath:Usable() and (
-		Target.health.pct < 20 or
-		(Deathspeaker.known and Deathspeaker:Up() and DevouringPlague:Up()) or
-		(InescapableTorment.known and Player.fiend_up)
+	if MindBlast:Usable() and (
+		not MindDevourer.known or
+		MindDevourer:Down() or
+		(self.use_cds and VoidEruption.known and VoidEruption:Ready())
 	) then
-		return ShadowWordDeath
+		return MindBlast
+	end
+	if VoidVolley:Usable() then
+		UseCooldown(VoidVolley)
 	end
 	if DevouringPlague:Usable() and (
-		(EmpoweredSurges.known and SurgeOfInsanity:Up()) or
-		(VoidEruption.known and Voidform:Up())
+		DistortedReality.known or
+		(VoidEruption.known and Voidform:Up()) or
+		(PowerSurge.known and PowerSurge.Shadow:Up())
 	) then
 		return DevouringPlague
-	end
-	if UnfurlingDarkness.known and VampiricTouch:Usable() and UnfurlingDarkness:Ready(VampiricTouch:CastTime()) then
-		return VampiricTouch
 	end
 	if Halo.Shadow:Usable() and Player.enemies > 1 then
 		UseCooldown(Halo.Shadow)
 	end
-	if TwistOfFate.known and PowerWordLife:Usable() and TwistOfFate:Down() and TwistOfFate:CanTriggerOnAllyHeal() then
-		UseExtra(PowerWordLife)
+	if TwistOfFate.known and TwistOfFate:Down() and TwistOfFate:CanTriggerOnAllyHeal() then
+		self:heal_for_tof()
 	end
-	local apl = self:empowered_filler()
-	if apl then return apl end
-	if not Player.moving then
-		if MindSpike:Usable() then
-			return MindSpike
-		end
-		if MindFlay:Usable() then
-			MindFlay.interrupt_if = self.channel_interrupt[1]
-			return MindFlay
-		end
+	if DescendingDarkness.known and ShadowCrash:Usable() and not ShadowCrash:InFlight() and ShadowCrash:ChargesFractional() > 1.5 then
+		UseCooldown(ShadowCrash)
+	end
+	if ShadowWordDeath:Usable() and (
+		Target.health.pct < (20 + (Deathspeaker.known and 15 or 0)) or
+		(InescapableTorment.known and Player.fiend_up)
+	) then
+		return ShadowWordDeath
+	end
+	if not Player.moving and MindFlay:Usable() then
+		MindFlay.interrupt_if = self.channel_interrupt[1]
+		return MindFlay
 	end
 	if DivineStar.Shadow:Usable() then
 		UseCooldown(DivineStar.Shadow)
 	end
-	if ShadowCrash:Usable() then
+	if ShadowCrash:Usable() and not self.holding_crash and not ShadowCrash:InFlight() and ShadowCrash:ChargesFractional() > 1.5 then
 		UseCooldown(ShadowCrash)
 	end
 	if ShadowWordDeath:Usable() then
@@ -3267,13 +3178,6 @@ actions.filler+=/shadow_word_pain,target_if=min:remains
 	end
 	if ShadowWordPain:Usable() then
 		return ShadowWordPain
-	end
-	if MindSpike:Usable() then
-		return MindSpike
-	end
-	if MindFlay:Usable() then
-		MindFlay.interrupt_if = self.channel_interrupt[1]
-		return MindFlay
 	end
 end
 
@@ -3289,14 +3193,15 @@ actions.heal_for_tof+=/holy_nova,if=buff.rhapsody.stack=20&talent.rhapsody
 		UseExtra(DivineStar.Shadow)
 	elseif Rhapsody.known and HolyNova:Usable() and Rhapsody:Capped() then
 		UseExtra(HolyNova)
-	elseif CrystallineReflection.known and PowerWordShield:Usable() then
-		UseExtra(PowerWordShield)
 	end
 end
 
 APL[SPEC.SHADOW].channel_interrupt = {
 	[1] = function() -- Mind Flay
 		return Player.channel.ticks >= 2
+	end,
+	[2] = function() -- Void Torrent
+		return not EntropicRift.known
 	end,
 }
 
