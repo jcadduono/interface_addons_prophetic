@@ -2964,7 +2964,7 @@ actions.cds+=/call_action_list,name=trinkets
 actions.cds+=/desperate_prayer,if=health.pct<=75
 ]]
 	if PowerInfusion:Usable() and (
-		(not (VoidEruption.known or DarkAscension.known) and Player.fiend_up) or
+		(Player.fiend_up and not (VoidEruption.known or DarkAscension.known)) or
 		(VoidEruption.known and Voidform:Up()) or
 		(DarkAscension.known and DarkAscension:Up()) or
 		(Target.boss and Target.timeToDie < 20)
@@ -2977,8 +2977,8 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 		(Player.enemies > 2 and not InescapableTorment.known)
 	)
 	if PowerSurge.known and Halo.Shadow:Usable() and (
-		not DarkAscension.known or
-		self.cd_condition
+		self.cd_condition or
+		not DarkAscension.known
 	) and (
 		not VoidEruption.known or
 		MindBlast:Charges() == 0 or
@@ -2986,7 +2986,7 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 	) then
 		return UseCooldown(Halo.Shadow)
 	end
-	if self.cd_condition and VoidEruption:Usable() and not Player.fiend:Ready() and (
+	if self.cd_condition and VoidEruption:Usable() and (
 		MindBlast:Charges() == 0 or
 		Player:TimeInCombat() > 15
 	) then
@@ -3000,6 +3000,21 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 	end
 	if Opt.trinket then
 		self:trinkets()
+	end
+	if Player.fiend:Usable() and (
+		(ShadowWordPain:Up() and self.dots_up) or
+		(ShadowCrash.known and ShadowCrash:InFlight())
+	) and (
+		not PowerSurge.known or
+		PowerSurge.Shadow:Up() or
+		(Halo.Shadow.known and Halo.Shadow:Ready())
+	) and (
+		Target.timeToDie < 15 or
+		(DarkAscension.known and DarkAscension:Ready(Player.gcd)) or
+		(VoidEruption.known and (VoidEruption:Ready(Player.gcd) or (MindbenderShadow.known and not VoidEruption:Ready(50)))) or
+		not (DarkAscension.known or VoidEruption.known)
+	) then
+		return UseCooldown(Player.fiend)
 	end
 end
 
@@ -3054,30 +3069,9 @@ actions.main+=/shadow_word_death,target_if=target.health.pct<20
 actions.main+=/shadow_word_death,target_if=max:dot.devouring_plague.remains
 actions.main+=/shadow_word_pain,target_if=min:remains
 ]]
-	self.dots_up = VampiricTouch:Ticking() >= Player.enemies or (ShadowCrash.known and ShadowCrash:InFlight())
-	if self.use_cds and (
-		(Target.boss and Target.timeToDie < 30) or
-		(Target.timeToDie > 15 and (not self.holding_crash or Player.enemies > 2))
-	) then
+	self.dots_up = VampiricTouch:Ticking() >= min(6, Player.enemies) or (ShadowCrash.known and ShadowCrash:InFlight())
+	if self.use_cds then
 		self:cds()
-	end
-	if Player.fiend:Usable() and (
-		(ShadowWordPain:Up() and self.dots_up) or
-		(ShadowCrash.known and ShadowCrash:InFlight())
-	) and (
-		not PowerSurge.known or
-		PowerSurge.Shadow:Up() or
-		(Halo.Shadow.known and Halo.Shadow:Ready())
-	) and (
-		(self.use_cds and ((Target.boss and Target.timeToDie < 30) or Target.timeToDie > 15) and (
-			Target.timeToDie < 15 or (
-				(not DarkAscension.known or DarkAscension:Ready(Player.gcd)) and
-				(not VoidEruption.known or VoidEruption:Ready(Player.gcd))
-			)
-		)) or
-		(VoidEruption.known and not VoidEruption:Ready(50))
-	) then
-		UseCooldown(Player.fiend)
 	end
 	if VoidBlast:Usable() and (
 		EntropicRift:Remains() <= Player.gcd or
@@ -3144,7 +3138,7 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 	if MindBlast:Usable() and (
 		not MindDevourer.known or
 		MindDevourer:Down() or
-		(self.use_cds and VoidEruption.known and VoidEruption:Ready())
+		(self.use_cds and VoidEruption.known and VoidEruption:Ready(MindBlast:Charges() * MindBlast:CastTime()))
 	) then
 		return MindBlast
 	end
