@@ -2973,6 +2973,7 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 	end
 	self.cd_condition = (
 		(Player.fiend_up and not Player.fiend:Ready(4)) or
+		(Player.insanity.deficit < 40 and Player.fiend:Ready(4)) or
 		(not MindbenderShadow.known and not Player.fiend:Ready()) or
 		(Player.enemies > 2 and not InescapableTorment.known)
 	)
@@ -2987,6 +2988,7 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 		return UseCooldown(Halo.Shadow)
 	end
 	if self.cd_condition and VoidEruption:Usable() and (
+		Player.insanity.deficit < 40 or
 		MindBlast:Charges() == 0 or
 		Player:TimeInCombat() > 15
 	) then
@@ -3001,7 +3003,7 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 	if Opt.trinket then
 		self:trinkets()
 	end
-	if Player.fiend:Usable() and (
+	if Player.fiend:Usable() and Player.insanity.deficit >= 16 and (
 		(ShadowWordPain:Up() and self.dots_up) or
 		(ShadowCrash.known and ShadowCrash:InFlight())
 	) and (
