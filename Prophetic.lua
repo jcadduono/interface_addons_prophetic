@@ -2587,6 +2587,9 @@ actions+=/halo,if=spell_targets.halo>=3
 			UseCooldown(PowerInfusion)
 		end
 	end
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (2 * Player.gcd) and DarkeningHorizon:Up() then
+		return VoidBlast
+	end
 	if InescapableTorment.known and Player.fiend_up then
 		local apl = self:torment()
 		if apl then return apl end
@@ -2615,7 +2618,7 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.haste_factor) and DarkeningHorizon:Up() then
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and DarkeningHorizon:Up() then
 		return VoidBlast
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
@@ -2630,7 +2633,7 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Halo.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(Halo.Shadow)
 	end
-	if Rhapsody.known and HolyNova:Usable() and (not VoidBlast.known or Pet.EntropicRift:Down()) and Player.enemies >= 3 and Rhapsody:Capped(Player.enemies) then
+	if Rhapsody.known and HolyNova:Usable() and (not VoidBlast.known or Pet.EntropicRift:Down()) and Player.enemies >= 3 and Rhapsody:Capped(1) then
 		UseCooldown(HolyNova)
 	end
 	if ShadowWordPain:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and ShadowWordPain:Remains() < 10 and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
@@ -2698,7 +2701,7 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
 	end
-	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Capped(Player.enemies) then
+	if Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 and Rhapsody:Capped(1) then
 		UseCooldown(HolyNova)
 	end
 	if DivineStar:Usable() then
@@ -2707,29 +2710,25 @@ APL[SPEC.DISCIPLINE].te_holy = function(self)
 	if Halo:Usable() then
 		UseCooldown(Halo)
 	end
-	if Rhapsody.known and HolyNova:Usable() and Rhapsody:Capped(Player.enemies) then
+	if Rhapsody.known and HolyNova:Usable() and Rhapsody:Capped() then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
 		return Smite
 	end
-	if not Rhapsody.known and HolyNova:Usable() and Player.enemies >= 3 then
+	if HolyNova:Usable() and Player.enemies >= 3 and (not Rhapsody.known or Rhapsody:Capped(3)) then
 		UseCooldown(HolyNova)
 	end
 end
 
 APL[SPEC.DISCIPLINE].te_shadow = function(self)
-	if InescapableTorment.known and Player.fiend_up then
-		local apl = self:torment()
-		if apl then return apl end
-	end
 	if DarkReprimand:Usable() and not self.hold_penance then
 		return DarkReprimand
 	end
 	if Penance:Usable() and not self.hold_penance and Penance:Equilibrium() == 'shadow' then
 		return Penance
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.haste_factor) and DarkeningHorizon:Up() then
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and DarkeningHorizon:Up() then
 		return VoidBlast
 	end
 	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
@@ -2790,9 +2789,6 @@ actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 	if ShadowWordDeath:Usable() and Player.fiend_remains < (Player.gcd * 2) then
 		return ShadowWordDeath
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (2 * Player.haste_factor) and DarkeningHorizon:Up() then
-		return VoidBlast
-	end
 	if Expiation.known and ShadowWordPain:Usable() and ShadowWordPain:Remains() < (3 * Expiation.rank) and Target.timeToDie > ShadowWordPain:Remains() then
 		return ShadowWordPain
 	end
@@ -2805,7 +2801,7 @@ actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (4 * Player.haste_factor) and DarkeningHorizon:Up() then
+	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and DarkeningHorizon:Up() then
 		return VoidBlast
 	end
 	if ShadowWordDeath:Usable() and (
@@ -2924,7 +2920,7 @@ actions.aoe+=/vampiric_touch,if=(variable.max_vts>0&!variable.manual_vts_applied
 actions.aoe+=/shadow_crash,if=!variable.holding_crash,target_if=dot.vampiric_touch.refreshable|dot.vampiric_touch.remains<=target.time_to_die&!buff.voidform.up&(raid_event.adds.in-dot.vampiric_touch.remains)<15
 ]]
 	self:aoe_variables()
-	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (self.max_vts > 0 and not self.manual_vts_applied and not ShadowCrash:InFlight()) and (not EntropicRift.known or EntropicRift:Down()) then
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (self.max_vts > 0 and not self.manual_vts_applied and not ShadowCrash:InFlight()) and (not EntropicRift.known or Pet.EntropicRift:Down()) then
 		return VampiricTouch
 	end
 	if ShadowCrash:Usable() and not self.holding_crash and not ShadowCrash:InFlight() and VampiricTouch:Refreshable() and ShadowCrash:ChargesFractional() > 1.5 then
@@ -3076,10 +3072,10 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 		self:cds()
 	end
 	if VoidBlast:Usable() and (
-		EntropicRift:Remains() <= Player.gcd or
+		Pet.EntropicRift:Remains() <= Player.gcd or
 		(
 			DevouringPlague:Remains() >= VoidBlast:CastTime() or
-			EntropicRift:Remains() <= Player.gcd or
+			Pet.EntropicRift:Remains() <= Player.gcd or
 			(VoidEmpowerment.known and VoidTorrent:Channeling())
 		) and (
 			Player.insanity.deficit >= 16 or
@@ -3105,7 +3101,7 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 		not VoidEruption:Ready(Player.gcd * 3) or
 		Player.insanity.deficit <= 35 or
 		(MindDevourer.known and MindDevourer:Up()) or
-		(EntropicRift.known and EntropicRift:Up())
+		(EntropicRift.known and Pet.EntropicRift:Up())
 		--(PowerSurge.known and PowerSurge.Shadow:Up() and Ascension:Up())
 	) then
 		return DevouringPlague
@@ -3119,7 +3115,7 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 	end
 	if VoidVolley:Usable() and (
 		VoidVolley.buff:Remains() <= 5 or
-		(EntropicRift.known and EntropicRift:Up() and VoidBlast:Cooldown() < EntropicRift:Remains()) or
+		(EntropicRift.known and Pet.EntropicRift:Up() and VoidBlast:Cooldown() < Pet.EntropicRift:Remains()) or
 		Target.timeToDie <= 5
 	) then
 		UseCooldown(VoidVolley)
