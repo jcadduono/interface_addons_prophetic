@@ -1346,35 +1346,36 @@ VoidVolley.damage:AutoAoe()
 ------ Procs
 
 -- Hero talents
+Hero = {}
 ---- Archon
-local EmpoweredSurges = Ability:Add(453799, false, true)
-local PerfectedForm = Ability:Add(453917, true, true)
-local PowerSurge = Ability:Add(453109, true, true, 453112)
-PowerSurge.buff_duration = 10
-PowerSurge.Shadow = Ability:Add(453113, true, true)
-PowerSurge.Shadow.buff_duration = 10
+Hero.EmpoweredSurges = Ability:Add(453799, false, true)
+Hero.PerfectedForm = Ability:Add(453917, true, true)
+Hero.PowerSurge = Ability:Add(453109, true, true, 453112)
+Hero.PowerSurge.buff_duration = 10
+Hero.PowerSurge.Shadow = Ability:Add(453113, true, true)
+Hero.PowerSurge.Shadow.buff_duration = 10
 ---- Voidweaver
-local DarkeningHorizon = Ability:Add(449912, true, true)
-DarkeningHorizon.max_stack = 3
-local EntropicRift = Ability:Add(450193, true, true)
-EntropicRift.buff_duration = 8
-EntropicRift.learn_spellId = 447444
-EntropicRift.dot = Ability:Add(447448, false, true)
-EntropicRift.dot:AutoAoe()
-local InnerQuietus = Ability:Add(448278, false, true)
-local VoidBlast = Ability:Add(450215, false, true)
-VoidBlast.mana_cost = 0.2
-VoidBlast.triggers_combat = true
-VoidBlast.equilibrium = 'shadow'
-VoidBlast.learn_spellId = 450405
-local VoidEmpowerment = Ability:Add(450138, true, true)
-VoidEmpowerment.buff = Ability:Add(450150, true, true)
-VoidEmpowerment.buff.buff_duration = 15
-local VoidInfusion = Ability:Add(450612, true, true)
-local Voidwraith = Ability:Add(451235, true, true)
-Voidwraith.cooldown_duration = 120
-Voidwraith.buff_duration = 15
-Voidwraith.learn_spellId = 451234
+Hero.DarkeningHorizon = Ability:Add(449912, true, true)
+Hero.DarkeningHorizon.max_stack = 3
+Hero.EntropicRift = Ability:Add(450193, true, true)
+Hero.EntropicRift.buff_duration = 8
+Hero.EntropicRift.learn_spellId = 447444
+Hero.EntropicRift.dot = Ability:Add(447448, false, true)
+Hero.EntropicRift.dot:AutoAoe()
+Hero.InnerQuietus = Ability:Add(448278, false, true)
+Hero.VoidBlast = Ability:Add(450215, false, true)
+Hero.VoidBlast.mana_cost = 0.2
+Hero.VoidBlast.triggers_combat = true
+Hero.VoidBlast.equilibrium = 'shadow'
+Hero.VoidBlast.learn_spellId = 450405
+Hero.VoidEmpowerment = Ability:Add(450138, true, true)
+Hero.VoidEmpowerment.buff = Ability:Add(450150, true, true)
+Hero.VoidEmpowerment.buff.buff_duration = 15
+Hero.VoidInfusion = Ability:Add(450612, true, true)
+Hero.Voidwraith = Ability:Add(451235, true, true)
+Hero.Voidwraith.cooldown_duration = 120
+Hero.Voidwraith.buff_duration = 15
+Hero.Voidwraith.learn_spellId = 451234
 -- Tier set bonuses
 
 -- Racials
@@ -1400,6 +1401,8 @@ function SummonedPets:Purge()
 end
 
 function SummonedPets:Update()
+	Pet.EntropicRift.summon_spell = Shadowform.known and VoidTorrent or MindBlast
+
 	wipe(self.known)
 	wipe(self.byUnitId)
 	for _, pet in next, self.all do
@@ -1523,8 +1526,8 @@ end
 Pet.Lightspawn = SummonedPet:Add(128140, 15, Lightspawn)
 Pet.Shadowfiend = SummonedPet:Add(19668, 15, Shadowfiend)
 Pet.Mindbender = SummonedPet:Add(62982, 15, Mindbender)
-Pet.Voidwraith = SummonedPet:Add(224466, 15, Voidwraith)
-Pet.EntropicRift = SummonedPet:Add(223273, 8, MindBlast, EntropicRift)
+Pet.Voidwraith = SummonedPet:Add(224466, 15, Hero.Voidwraith)
+Pet.EntropicRift = SummonedPet:Add(223273, 8, MindBlast, Hero.EntropicRift)
 
 -- End Summoned Pets
 
@@ -1914,8 +1917,8 @@ function Player:UpdateKnown()
 		Pet.Mindbender.duration = self.fiend.buff_duration
 		Pet.Mindbender.summon_spell = self.fiend
 		Pet.Mindbender.learn_spell = self.fiend
-	elseif Voidwraith.known then
-		self.fiend = Voidwraith
+	elseif Hero.Voidwraith.known then
+		self.fiend = Hero.Voidwraith
 	elseif Lightspawn.known then
 		self.fiend = Lightspawn
 	end
@@ -1933,8 +1936,9 @@ function Player:UpdateKnown()
 		VoidVolley.buff.known = true
 		VoidVolley.damage.known = true
 	end
+	Hero.VoidBlast.requires_charge = Shadowform.known
 	MindFlayInsanity.known = MindFlay.known and SurgeOfInsanity.known
-	PowerSurge.Shadow.known = PowerSurge.known and Shadowform.known
+	Hero.PowerSurge.Shadow.known = Hero.PowerSurge.known and Shadowform.known
 
 	Abilities:Update()
 	SummonedPets:Update()
@@ -2116,7 +2120,7 @@ function Target:UpdateHealth(reset)
 		table.remove(self.health.history, 1)
 		self.health.history[25] = self.health.current
 	end
-	self.timeToDieMax = self.health.current / Player.health.max * (Player.spec == SPEC.SHADOW and 15 or 25)
+	self.timeToDieMax = self.health.current / Player.health.max * (Shadowform.known and 15 or 25)
 	self.health.pct = self.health.max > 0 and (self.health.current / self.health.max * 100) or 100
 	self.health.loss_per_sec = (self.health.history[1] - self.health.current) / 5
 	self.timeToDie = (
@@ -2301,16 +2305,20 @@ function MindbenderDisc:Remains()
 end
 MindbenderShadow.Remains = MindbenderDisc.Remains
 
-function Voidwraith:Remains()
+function Hero.Voidwraith:Remains()
 	return Pet.Voidwraith:Remains()
 end
 
-function VoidBlast:Available(...)
+function Hero.VoidBlast:Available(...)
 	return self.known and Pet.EntropicRift:Up()
 end
 
+function MindBlast:Available(...)
+	return not (Shadowform.known and Hero.VoidBlast:Available())
+end
+
 function Smite:Available(...)
-	return not VoidBlast:Available()
+	return not (not Shadowform.known and Hero.VoidBlast:Available())
 end
 
 function DevouringPlague:Duration()
@@ -2336,7 +2344,7 @@ function DevouringPlague:InsanityCost()
 end
 
 function InescapableTorment:Activate()
-	if Voidwraith.known then
+	if Hero.Voidwraith.known then
 		Pet.Voidwraith:ExtendAll(0.7)
 	elseif MindbenderShadow.known then
 		Pet.Mindbender:ExtendAll(0.7)
@@ -2421,15 +2429,15 @@ function PowerWordLife:Available(...)
 	return Player.health.pct < 35
 end
 
-function DarkeningHorizon:Stack()
+function Hero.DarkeningHorizon:Stack()
 	local stack = self.stacks
-	if VoidBlast:Casting() then
+	if Hero.VoidBlast:Casting() then
 		stack = stack - 1
 	end
 	return max(0, stack)
 end
 
-function DarkeningHorizon:Remains()
+function Hero.DarkeningHorizon:Remains()
 	local stack = self:Stack()
 	if stack == 0 then
 		return 0
@@ -2437,20 +2445,20 @@ function DarkeningHorizon:Remains()
 	return Pet.EntropicRift:Remains()
 end
 
-function PowerSurge:Remains()
+function Hero.PowerSurge:Remains()
 	if self.known and (Halo:Casting() or Halo.Shadow:Casting()) then
 		return self:Duration()
 	end
 	return Ability.Remains(self)
 end
-PowerSurge.Shadow.Remains = PowerSurge.Remains
+Hero.PowerSurge.Shadow.Remains = Hero.PowerSurge.Remains
 
-function VoidBlast:CastLanded(...)
-	if DarkeningHorizon.known then
+function Hero.VoidBlast:CastLanded(...)
+	if Hero.DarkeningHorizon.known then
 		for guid, unit in next, Pet.EntropicRift.active_units do
-			if unit.expires > Player.time and DarkeningHorizon.stacks > 0 then
+			if unit.expires > Player.time and Hero.DarkeningHorizon.stacks > 0 then
 				unit.expires = unit.expires + 1.0
-				DarkeningHorizon.stacks = DarkeningHorizon.stacks - 1
+				Hero.DarkeningHorizon.stacks = Hero.DarkeningHorizon.stacks - 1
 			end
 		end
 	end
@@ -2488,8 +2496,8 @@ Pet.Voidwraith.CastLanded = Pet.Mindbender.CastLanded
 
 function Pet.EntropicRift:AddUnit(...)
 	local pet = SummonedPet.AddUnit(self, ...)
-	if DarkeningHorizon.known then
-		DarkeningHorizon.stacks = DarkeningHorizon:MaxStack()
+	if Hero.DarkeningHorizon.known then
+		Hero.DarkeningHorizon.stacks = Hero.DarkeningHorizon:MaxStack()
 	end
 	return pet
 end
@@ -2587,8 +2595,8 @@ actions+=/halo,if=spell_targets.halo>=3
 			UseCooldown(PowerInfusion)
 		end
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (2 * Player.gcd) and DarkeningHorizon:Up() then
-		return VoidBlast
+	if Hero.DarkeningHorizon.known and Hero.VoidBlast:Usable() and Pet.EntropicRift:Remains() < (2 * Player.gcd) and Hero.DarkeningHorizon:Up() then
+		return Hero.VoidBlast
 	end
 	if InescapableTorment.known and Player.fiend_up then
 		local apl = self:torment()
@@ -2618,8 +2626,8 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and DarkeningHorizon:Up() then
-		return VoidBlast
+	if Hero.DarkeningHorizon.known and Hero.VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and Hero.DarkeningHorizon:Up() then
+		return Hero.VoidBlast
 	end
 	if DivineStar:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar)
@@ -2633,7 +2641,7 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if Halo.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(Halo.Shadow)
 	end
-	if Rhapsody.known and HolyNova:Usable() and (not VoidBlast.known or Pet.EntropicRift:Down()) and Player.enemies >= 3 and Rhapsody:Capped(1) then
+	if Rhapsody.known and HolyNova:Usable() and (not Hero.VoidBlast.known or Pet.EntropicRift:Down()) and Player.enemies >= 3 and Rhapsody:Capped(1) then
 		UseCooldown(HolyNova)
 	end
 	if ShadowWordPain:Usable() and Schism.known and MindBlast:Ready(Player.gcd * 2) and ShadowWordPain:Remains() < 10 and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
@@ -2662,8 +2670,8 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if ShadowWordPain:Usable() and ShadowWordPain:Refreshable() and Target.timeToDie > (ShadowWordPain:Remains() + (ShadowWordPain:TickTime() * 3)) then
 		return ShadowWordPain
 	end
-	if VoidBlast:Usable() then
-		return VoidBlast
+	if Hero.VoidBlast:Usable() then
+		return Hero.VoidBlast
 	end
 	if DivineStar:Usable() then
 		UseCooldown(DivineStar)
@@ -2680,7 +2688,7 @@ APL[SPEC.DISCIPLINE].standard = function(self)
 	if MindBlast:Usable() and (not InescapableTorment.known or Player.fiend_up or not Player.fiend:Ready(12 * Player.haste_factor)) then
 		return MindBlast
 	end
-	if HolyNova:Usable() and Player.enemies >= 3 and not (TwilightEquilibrium.known and Rhapsody.known) and (not VoidBlast.known or Pet.EntropicRift:Down()) then
+	if HolyNova:Usable() and Player.enemies >= 3 and not (TwilightEquilibrium.known and Rhapsody.known) and (not Hero.VoidBlast.known or Pet.EntropicRift:Down()) then
 		UseCooldown(HolyNova)
 	end
 	if Smite:Usable() then
@@ -2728,8 +2736,8 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	if Penance:Usable() and not self.hold_penance and Penance:Equilibrium() == 'shadow' then
 		return Penance
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and DarkeningHorizon:Up() then
-		return VoidBlast
+	if Hero.DarkeningHorizon.known and Hero.VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and Hero.DarkeningHorizon:Up() then
+		return Hero.VoidBlast
 	end
 	if DivineStar.Shadow:Usable() and Player.enemies >= 3 then
 		UseCooldown(DivineStar.Shadow)
@@ -2760,8 +2768,8 @@ APL[SPEC.DISCIPLINE].te_shadow = function(self)
 	) then
 		return ShadowWordDeath
 	end
-	if VoidBlast:Usable() then
-		return VoidBlast
+	if Hero.VoidBlast:Usable() then
+		return Hero.VoidBlast
 	end
 	if DivineStar.Shadow:Usable() then
 		UseCooldown(DivineStar.Shadow)
@@ -2801,8 +2809,8 @@ actions.torment+=/mind_blast,if=pet.fiend.remains>=execute_time
 	if Penance:Usable() and not self.hold_penance then
 		return Penance
 	end
-	if DarkeningHorizon.known and VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and DarkeningHorizon:Up() then
-		return VoidBlast
+	if Hero.DarkeningHorizon.known and Hero.VoidBlast:Usable() and Pet.EntropicRift:Remains() < (3 * Player.gcd) and Hero.DarkeningHorizon:Up() then
+		return Hero.VoidBlast
 	end
 	if ShadowWordDeath:Usable() and (
 		Target.health.pct < 20 or
@@ -2843,7 +2851,7 @@ end
 APL[SPEC.SHADOW].Main = function(self)
 	self.use_cds = Opt.cooldown and (
 		(Target.boss or Target.player or (not Opt.boss_only and Target.timeToDie > (Opt.cd_ttd - min(Player.enemies - 1, 6)))) or
-		(PowerSurge.known and Halo.Shadow.known and PowerSurge.Shadow:Remains() > 5) or
+		(Hero.PowerSurge.known and Halo.Shadow.known and Hero.PowerSurge.Shadow:Remains() > 5) or
 		(PowerInfusion.known and PowerInfusion:Remains() > 8) or
 		(DarkAscension.known and DarkAscension:Remains() > 8) or
 		(VoidEruption.known and Voidform:Remains() > 8) or
@@ -2920,7 +2928,7 @@ actions.aoe+=/vampiric_touch,if=(variable.max_vts>0&!variable.manual_vts_applied
 actions.aoe+=/shadow_crash,if=!variable.holding_crash,target_if=dot.vampiric_touch.refreshable|dot.vampiric_touch.remains<=target.time_to_die&!buff.voidform.up&(raid_event.adds.in-dot.vampiric_touch.remains)<15
 ]]
 	self:aoe_variables()
-	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (self.max_vts > 0 and not self.manual_vts_applied and not ShadowCrash:InFlight()) and (not EntropicRift.known or Pet.EntropicRift:Down()) then
+	if VampiricTouch:Usable() and VampiricTouch:Refreshable() and Target.timeToDie > (VampiricTouch:Remains() + (VampiricTouch:TickTime() * 4)) and (self.max_vts > 0 and not self.manual_vts_applied and not ShadowCrash:InFlight()) and (not Hero.EntropicRift.known or Pet.EntropicRift:Down()) then
 		return VampiricTouch
 	end
 	if ShadowCrash:Usable() and not self.holding_crash and not ShadowCrash:InFlight() and VampiricTouch:Refreshable() and ShadowCrash:ChargesFractional() > 1.5 then
@@ -2973,7 +2981,7 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 		(not MindbenderShadow.known and not Player.fiend:Ready()) or
 		(Player.enemies > 2 and not InescapableTorment.known)
 	)
-	if PowerSurge.known and Halo.Shadow:Usable() and (
+	if Hero.PowerSurge.known and Halo.Shadow:Usable() and (
 		self.cd_condition or
 		not DarkAscension.known
 	) and (
@@ -3003,8 +3011,8 @@ actions.cds+=/desperate_prayer,if=health.pct<=75
 		(ShadowWordPain:Up() and self.dots_up) or
 		(ShadowCrash.known and ShadowCrash:InFlight())
 	) and (
-		not PowerSurge.known or
-		PowerSurge.Shadow:Up() or
+		not Hero.PowerSurge.known or
+		Hero.PowerSurge.Shadow:Up() or
 		(Halo.Shadow.known and Halo.Shadow:Ready())
 	) and (
 		Target.timeToDie < 15 or
@@ -3071,22 +3079,22 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 	if self.use_cds then
 		self:cds()
 	end
-	if VoidBlast:Usable() and (
+	if Hero.VoidBlast:Usable() and (
 		Pet.EntropicRift:Remains() <= Player.gcd or
 		(
-			DevouringPlague:Remains() >= VoidBlast:CastTime() or
+			DevouringPlague:Remains() >= Hero.VoidBlast:CastTime() or
 			Pet.EntropicRift:Remains() <= Player.gcd or
-			(VoidEmpowerment.known and VoidTorrent:Channeling())
+			(Hero.VoidEmpowerment.known and VoidTorrent:Channeling())
 		) and (
 			Player.insanity.deficit >= 16 or
 			MindBlast:FullRechargeTime() <= Player.gcd
 		)
 	) then
-		return VoidBlast
+		return Hero.VoidBlast
 	end
 	if DevouringPlague:Usable() and (
 		Player.insanity.deficit <= 16 or
-		(VoidEruption.known and PerfectedForm.known and Voidform:Up() and Voidform:Remains() <= Player.gcd * 2)
+		(VoidEruption.known and Hero.PerfectedForm.known and Voidform:Up() and Voidform:Remains() <= Player.gcd * 2)
 	) then
 		return DevouringPlague
 	end
@@ -3101,13 +3109,13 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 		not VoidEruption:Ready(Player.gcd * 3) or
 		Player.insanity.deficit <= 35 or
 		(MindDevourer.known and MindDevourer:Up()) or
-		(EntropicRift.known and Pet.EntropicRift:Up())
-		--(PowerSurge.known and PowerSurge.Shadow:Up() and Ascension:Up())
+		(Hero.EntropicRift.known and Pet.EntropicRift:Up())
+		--(Hero.PowerSurge.known and Hero.PowerSurge.Shadow:Up() and Ascension:Up())
 	) then
 		return DevouringPlague
 	end
 	if VoidTorrent:Usable() and not self.holding_crash and (
-		(DevouringPlague:Remains() >= 2.5 and (not DarkAscension.known or not VoidBlast.known or not DarkAscension:Ready(12))) or
+		(DevouringPlague:Remains() >= 2.5 and (not DarkAscension.known or not Hero.VoidBlast.known or not DarkAscension:Ready(12))) or
 		(VoidEruption.known and VoidEruption:Ready(3))
 	) then
 		VoidTorrent.interrupt_if = self.channel_interrupt[2]
@@ -3115,7 +3123,7 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 	end
 	if VoidVolley:Usable() and (
 		VoidVolley.buff:Remains() <= 5 or
-		(EntropicRift.known and Pet.EntropicRift:Up() and VoidBlast:Cooldown() < Pet.EntropicRift:Remains()) or
+		(Hero.EntropicRift.known and Pet.EntropicRift:Up() and Hero.VoidBlast:Cooldown() < Pet.EntropicRift:Remains()) or
 		Target.timeToDie <= 5
 	) then
 		UseCooldown(VoidVolley)
@@ -3146,11 +3154,11 @@ actions.main+=/shadow_word_pain,target_if=min:remains
 	if DevouringPlague:Usable() and (
 		DistortedReality.known or
 		(VoidEruption.known and Voidform:Up()) or
-		(PowerSurge.known and PowerSurge.Shadow:Up())
+		(Hero.PowerSurge.known and Hero.PowerSurge.Shadow:Up())
 	) then
 		return DevouringPlague
 	end
-	if (self.use_cds or not PowerSurge.known) and Halo.Shadow:Usable() and Player.enemies > 1 then
+	if (self.use_cds or not Hero.PowerSurge.known) and Halo.Shadow:Usable() and Player.enemies > 1 then
 		UseCooldown(Halo.Shadow)
 	end
 	if TwistOfFate.known and TwistOfFate:Down() and TwistOfFate:CanTriggerOnAllyHeal() then
@@ -3189,7 +3197,7 @@ actions.heal_for_tof=halo
 actions.heal_for_tof+=/divine_star
 actions.heal_for_tof+=/holy_nova,if=buff.rhapsody.stack=20&talent.rhapsody
 ]]
-	if not PowerSurge.known and Halo.Shadow:Usable() then
+	if not Hero.PowerSurge.known and Halo.Shadow:Usable() then
 		UseExtra(Halo.Shadow)
 	elseif DivineStar.Shadow:Usable() then
 		UseExtra(DivineStar.Shadow)
@@ -3203,7 +3211,7 @@ APL[SPEC.SHADOW].channel_interrupt = {
 		return Player.channel.ticks >= 2
 	end,
 	[2] = function() -- Void Torrent
-		return not EntropicRift.known
+		return not Hero.EntropicRift.known
 	end,
 }
 
