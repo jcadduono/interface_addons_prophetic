@@ -1346,7 +1346,7 @@ VoidVolley.damage:AutoAoe()
 ------ Procs
 
 -- Hero talents
-Hero = {}
+local Hero = {}
 ---- Archon
 Hero.EmpoweredSurges = Ability:Add(453799, false, true)
 Hero.PerfectedForm = Ability:Add(453917, true, true)
@@ -1357,6 +1357,7 @@ Hero.PowerSurge.Shadow.buff_duration = 10
 ---- Voidweaver
 Hero.DarkeningHorizon = Ability:Add(449912, true, true)
 Hero.DarkeningHorizon.max_stack = 3
+Hero.DepthOfShadows = Ability:Add(451308, false, true)
 Hero.EntropicRift = Ability:Add(450193, true, true)
 Hero.EntropicRift.buff_duration = 8
 Hero.EntropicRift.learn_spellId = 447444
@@ -1917,7 +1918,7 @@ function Player:UpdateKnown()
 		Pet.Mindbender.duration = self.fiend.buff_duration
 		Pet.Mindbender.summon_spell = self.fiend
 		Pet.Mindbender.learn_spell = self.fiend
-	elseif Hero.Voidwraith.known then
+	elseif Hero.Voidwraith.known and not Hero.DepthOfShadows.known then
 		self.fiend = Hero.Voidwraith
 	elseif Lightspawn.known then
 		self.fiend = Lightspawn
