@@ -1699,6 +1699,10 @@ function Smite:ManaCost()
 	return self.mana_cost
 end
 
+function Shoot:Available()
+	return HasWandEquipped()
+end
+
 -- End Ability Modifications
 
 local function UseCooldown(ability, overwrite)
