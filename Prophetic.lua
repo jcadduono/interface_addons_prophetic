@@ -276,7 +276,7 @@ local Target = {
 	},
 	hostile = false,
 	estimated_range = 30,
-	npc_swing_types = { -- [npcId] = type
+	npc_swing_types = { -- [uid] = type
 	},
 }
 
@@ -1584,6 +1584,7 @@ function Target:Update()
 		self.boss = false
 		self.stunnable = true
 		self.classification = 'normal'
+		self.creature_type = 'Humanoid'
 		self.player = false
 		self.level = Player.level
 		self.hostile = false
@@ -1606,6 +1607,7 @@ function Target:Update()
 	self.boss = false
 	self.stunnable = true
 	self.classification = UnitClassification('target')
+	self.creature_type = UnitCreatureType('target')
 	self.player = UnitIsPlayer('target')
 	self.hostile = UnitCanAttack('player', 'target') and not UnitIsDead('target')
 	self.level = UnitLevel('target')
@@ -1614,7 +1616,7 @@ function Target:Update()
 	end
 	if not self.player and self.classification ~= 'minus' and self.classification ~= 'normal' then
 		self.boss = self.level >= (Player.level + 3)
-		self.stunnable = self.level < (Player.level + 2)
+		self.stunnable = self.level < (Player.level + 2) and (not Player.instance == 'raid' or (self.health.max > Player.health.max * 10))
 	end
 	if self.hostile or Opt.always_on then
 		UI:UpdateCombat()
@@ -2195,9 +2197,9 @@ CombatEvent.SWING_DAMAGE = function(event, srcGUID, dstGUID, amount, overkill, s
 		if uid > 0 then
 			if spellSchool then
 				if spellSchool > 1 and Target.npc_swing_types[uid] ~= spellSchool then
-					Target.npc_swing_types[npcId] = spellSchool
+					Target.npc_swing_types[uid] = spellSchool
 				end
-			elseif Target.npc_swing_types[npcId] then
+			elseif Target.npc_swing_types[uid] then
 				spellSchool = Target.npc_swing_types[uid]
 			end
 		end
@@ -2249,7 +2251,7 @@ CombatEvent.SPELL = function(event, srcGUID, dstGUID, spellId, spellName, spellS
 		return ability:CastSuccess(dstGUID)
 	elseif event == 'SPELL_CAST_START' then
 		return ability.CastStart and ability:CastStart(dstGUID)
-	elseif event == 'SPELL_CAST_FAILED'  then
+	elseif event == 'SPELL_CAST_FAILED' then
 		return ability.CastFailed and ability:CastFailed(dstGUID, missType)
 	elseif event == 'SPELL_ENERGIZE' then
 		return ability.Energize and ability:Energize(missType, overCap, powerType)
@@ -2761,9 +2763,9 @@ SlashCmdList[ADDON] = function(msg, editbox)
 		'aoe |cFF00C000on|r/|cFFC00000off|r - allow clicking main ability icon to toggle amount of targets (disables moving)',
 		'bossonly |cFF00C000on|r/|cFFC00000off|r - only use cooldowns on bosses',
 		'interrupt |cFF00C000on|r/|cFFC00000off|r - show an icon for interruptable spells',
-		'auto |cFF00C000on|r/|cFFC00000off|r  - automatically change target mode on AoE spells',
-		'ttl |cFFFFD000[seconds]|r  - time target exists in auto AoE after being hit (default is 10 seconds)',
-		'ttd |cFFFFD000[seconds]|r  - minimum enemy lifetime to use cooldowns on (default is 8 seconds, ignored on bosses)',
+		'auto |cFF00C000on|r/|cFFC00000off|r - automatically change target mode on AoE spells',
+		'ttl |cFFFFD000[seconds]|r - time target exists in auto AoE after being hit (default is 10 seconds)',
+		'ttd |cFFFFD000[seconds]|r - minimum enemy lifetime to use cooldowns on (default is 8 seconds, ignored on bosses)',
 		'pot |cFF00C000on|r/|cFFC00000off|r - show flasks and battle potions in cooldown UI',
 		'trinket |cFF00C000on|r/|cFFC00000off|r - show on-use trinkets in cooldown UI',
 		'|cFFFFD000reset|r - reset the location of the ' .. ADDON .. ' UI to default',
