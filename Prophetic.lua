@@ -26,14 +26,16 @@ local floor = math.floor
 local GetActionInfo = _G.GetActionInfo
 local GetBindingKey = _G.GetBindingKey
 local GetCombatRatingBonus = _G.GetCombatRatingBonus
-local GetPowerRegenForPowerType = _G.GetPowerRegenForPowerType
-local GetSpellCharges = C_Spell.GetSpellCharges
-local GetSpellCooldown = C_Spell.GetSpellCooldown
-local GetSpellInfo = C_Spell.GetSpellInfo
 local GetItemCount = C_Item.GetItemCount
 local GetItemCooldown = C_Item.GetItemCooldown
 local GetInventoryItemCooldown = _G.GetInventoryItemCooldown
 local GetItemInfo = C_Item.GetItemInfo
+local GetMacroItem = _G.GetMacroItem
+local GetMacroSpell = _G.GetMacroSpell
+local GetPowerRegenForPowerType = _G.GetPowerRegenForPowerType
+local GetSpellCharges = C_Spell.GetSpellCharges
+local GetSpellCooldown = C_Spell.GetSpellCooldown
+local GetSpellInfo = C_Spell.GetSpellInfo
 local GetTime = _G.GetTime
 local GetUnitSpeed = _G.GetUnitSpeed
 local IsSpellUsable = C_Spell.IsSpellUsable
@@ -1205,10 +1207,20 @@ function Button:UpdateAction()
 	end
 	local actionType, id, subType = GetActionInfo(self.action_id)
 	if id and type(id) == 'number' and id > 0 then
-		if (actionType == 'item' or (actionType == 'macro' and subType == 'item')) then
+		if actionType == 'item' or (actionType == 'macro' and subType == 'item') then
 			self.action = InventoryItems.byItemId[id]
-		elseif (actionType == 'spell' or (actionType == 'macro' and subType == 'spell')) then
+		elseif actionType == 'spell' or (actionType == 'macro' and subType == 'spell') then
 			self.action = Abilities.bySpellId[id]
+		elseif actionType == 'macro' then
+			local spellId = GetMacroSpell(id)
+			if type(spellId) == 'number' then
+				self.action = Abilities.bySpellId[spellId]
+				return
+			end
+			local itemId, itemLink = GetMacroItem(id)
+			if type(itemLink) == 'string' then
+				self.action = InventoryItems.byItemId[tonumber(itemLink:match('|Hitem:(%d+)'))]
+			end
 		end
 	end
 end
@@ -1299,7 +1311,7 @@ function Player:UnderMeleeAttack(physical)
 end
 
 function Player:UnderAttack()
-	return self.threat >= 3 or self:UnderMeleeAttack()
+	return self.threat.status >= 3 or self:UnderMeleeAttack()
 end
 
 function Player:TimeInCombat()
@@ -1778,6 +1790,9 @@ APL.HolyDisc = function(self)
 	if Shoot:Usable() then
 		return Shoot
 	end
+	if Smite:Usable() then
+		return Smite
+	end
 end
 
 APL.Shadow = function(self)
@@ -1829,6 +1844,9 @@ APL.Shadow = function(self)
 	end
 	if Shoot:Usable() then
 		return Shoot
+	end
+	if Smite:Usable() then
+		return Smite
 	end
 end
 
@@ -1993,12 +2011,6 @@ function UI:UpdateDisplay()
 		           (Player.cd.itemId and IsItemUsable(Player.cd.itemId)))
 	end
 	if Player.main then
-		if Player.main.requires_react then
-			local react = Player.main:React()
-			if react > 0 then
-				text_center = format('%.1f', react)
-			end
-		end
 		if Player.main_freecast then
 			border = 'freecast'
 		end
