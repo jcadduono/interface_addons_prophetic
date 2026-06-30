@@ -38,6 +38,7 @@ local GetSpellCooldown = C_Spell.GetSpellCooldown
 local GetSpellInfo = C_Spell.GetSpellInfo
 local GetTime = _G.GetTime
 local GetUnitSpeed = _G.GetUnitSpeed
+local IsCurrentSpell = _G.IsCurrentSpell
 local IsSpellUsable = C_Spell.IsSpellUsable
 local IsItemUsable = C_Item.IsUsableItem
 local UnitAttackSpeed = _G.UnitAttackSpeed
@@ -477,6 +478,10 @@ function Ability:Usable(seconds, pool)
 	return self:Ready(seconds)
 end
 
+function Ability:Active()
+	return IsCurrentSpell(self.spellId) or self.last_used > (Player.time - Player.gcd)
+end
+
 function Ability:Remains(mine, offGCD)
 	if self:Casting() or self:Traveling() > 0 then
 		return self:Duration()
@@ -903,6 +908,7 @@ end
 
 -- Priest Abilities
 ---- General
+local Attack = Ability:Add({6603}, false, true)
 local Shoot = Ability:Add({5019}, false, true)
 ---- Discipline
 local PowerWordFortitude = Ability:Add({1243, 1244, 1245, 2791, 10937, 10938, 25389}, true)
@@ -1783,18 +1789,7 @@ APL.HolyDisc = function(self)
 	if HolyFire:Usable() and HolyFire:Remains() < HolyFire:CastTime() and Target.timeToDie > (HolyFire:CastTime() + (HolyFire:TickTime() * 4)) and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > HolyFire:CastTime()) then
 		return HolyFire
 	end
-	if Smite:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
-		return Smite
-	end
-	if MindBlast:Usable() and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
-		return MindBlast
-	end
-	if Shoot:Usable() then
-		return Shoot
-	end
-	if Smite:Usable() then
-		return Smite
-	end
+	return self:Struggle()
 end
 
 APL.Shadow = function(self)
@@ -1844,11 +1839,33 @@ APL.Shadow = function(self)
 	if MindFlay:Usable() then
 		return MindFlay
 	end
+	return self:Struggle()
+end
+
+APL.Struggle = function(self) -- there's nothing we can do, so fall back to the basics
+	if ShadowWordPain:Usable() and ShadowWordPain:Down() and Target.timeToDie > (ShadowWordPain:TickTime() * 2) then
+		return ShadowWordPain
+	end
+	if MindBlast:Usable() and Player.mana.pct > 35 and Target.timeToDie > MindBlast:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > MindBlast:CastTime()) then
+		return MindBlast
+	end
+	if Smite:Usable() and Player.mana.pct > 65 and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
+		return Smite
+	end
 	if Shoot:Usable() then
+		if Shoot:Active() then
+			return
+		end
 		return Shoot
 	end
-	if Smite:Usable() then
+	if Smite:Usable() and Player.mana.pct > 35 and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
 		return Smite
+	end
+	if Attack:Usable() then
+		if Attack:Active() then
+			return
+		end
+		return Attack
 	end
 end
 
