@@ -1794,11 +1794,11 @@ end
 
 APL.Shadow = function(self)
 	if Player:TimeInCombat() == 0 then
-		if Shadowform:Down() then
+		if Shadowform:Usable() and Shadowform:Down() then
 			return Shadowform
 		end
 	else
-		if Shadowform:Down() then
+		if Shadowform:Usable() and Shadowform:Down() then
 			UseCooldown(Shadowform)
 		end
 	end
@@ -1836,7 +1836,7 @@ APL.Shadow = function(self)
 	if VampiricEmbrace:Usable() and (Target.boss or Target.timeToDie > 30) and VampiricEmbrace:Remains() < 4 then
 		UseExtra(VampiricEmbrace)
 	end
-	if MindFlay:Usable() then
+	if MindFlay:Usable() and Player.mana.pct > 15 then
 		return MindFlay
 	end
 	return self:Struggle()
@@ -1857,6 +1857,9 @@ APL.Struggle = function(self) -- there's nothing we can do, so fall back to the 
 			return
 		end
 		return Shoot
+	end
+	if MindFlay:Usable() then
+		return MindFlay
 	end
 	if Smite:Usable() and Player.mana.pct > 35 and Target.timeToDie > Smite:CastTime() and (not Player:UnderMeleeAttack() or PowerWordShield:Remains() > Smite:CastTime()) then
 		return Smite
