@@ -238,7 +238,6 @@ local Player = {
 		remains = 0,
 	},
 	channel = {
-		chained = false,
 		start = 0,
 		ends = 0,
 		remains = 0,
@@ -246,9 +245,7 @@ local Player = {
 		tick_interval = 0,
 		ticks = 0,
 		ticks_remain = 0,
-		ticks_extra = 0,
 		interruptible = false,
-		early_chainable = false,
 	},
 	threat = {
 		status = 0,
@@ -1409,25 +1406,18 @@ function Player:UpdateChannelInfo()
 	local _, _, _, start, ends, _, _, spellId = UnitChannelInfo('player')
 	if not spellId then
 		channel.ability = nil
-		channel.chained = false
 		channel.start = 0
 		channel.ends = 0
 		channel.tick_count = 0
 		channel.tick_interval = 0
 		channel.ticks = 0
 		channel.ticks_remain = 0
-		channel.ticks_extra = 0
 		channel.interrupt_if = nil
 		channel.interruptible = false
-		channel.early_chain_if = nil
-		channel.early_chainable = false
 		return
 	end
 	local ability = Abilities.bySpellId[spellId]
 	if ability then
-		if ability == channel.ability then
-			channel.chained = true
-		end
 		channel.interrupt_if = ability.interrupt_if
 	else
 		channel.interrupt_if = nil
@@ -1442,11 +1432,6 @@ function Player:UpdateChannelInfo()
 		channel.tick_interval = channel.ends - channel.start
 	end
 	channel.tick_count = (channel.ends - channel.start) / channel.tick_interval
-	if channel.chained then
-		channel.ticks_extra = channel.tick_count - floor(channel.tick_count)
-	else
-		channel.ticks_extra = 0
-	end
 	channel.ticks_remain = channel.tick_count
 end
 
@@ -1470,7 +1455,7 @@ function Player:Update()
 	self.cd = nil
 	self.interrupt = nil
 	self.extra = nil
-	self.clip_flay_early = false
+	MindFlay.clip_early = false
 	self:UpdateTime()
 	self.haste_factor = 1 / (1 + GetCombatRatingBonus(CR_HASTE_SPELL) / 100)
 	self.gcd = 1.5 * self.haste_factor
@@ -1490,7 +1475,7 @@ function Player:Update()
 	end
 	self.execute_remains = max(self.cast.remains, self.gcd_remains)
 	if self.channel.tick_count > 1 then
-		self.channel.ticks = ((self.ctime - self.channel.start) / self.channel.tick_interval) - self.channel.ticks_extra
+		self.channel.ticks = (self.ctime - self.channel.start) / self.channel.tick_interval
 		self.channel.ticks_remain = (self.channel.ends - self.ctime) / self.channel.tick_interval
 	end
 	if MindFlay.known and MindFlay:Channeling() then
@@ -1524,10 +1509,7 @@ function Player:Update()
 	self.main = APL:Main()
 
 	if self.channel.interrupt_if then
-		self.channel.interruptible = self.channel.ability ~= self.main and self.channel.interrupt_if()
-	end
-	if self.channel.early_chain_if then
-		self.channel.early_chainable = self.channel.ability == self.main and self.channel.early_chain_if()
+		self.channel.interruptible = self.channel.interrupt_if()
 	end
 end
 
@@ -1723,6 +1705,10 @@ function Shoot:Available()
 	return HasWandEquipped()
 end
 
+MindFlay.interrupt_if = function()
+	return Player.channel.ticks >= 2 and Player.main and Player.main ~= MindFlay
+end
+
 -- End Ability Modifications
 
 local function UseCooldown(ability, overwrite)
@@ -1809,7 +1795,7 @@ APL.Shadow = function(self)
 		UseCooldown(Shadowfiend)
 	end
 	if ShadowWordDeath:Usable(0.5 * Player.haste_factor) and (Target.timeToDie < 1 or Target:Health() < ShadowWordDeath:MinDamage()) then
-		Player.clip_flay_early = true
+		MindFlay.clip_early = true
 		return ShadowWordDeath
 	end
 	if MindBlast:Usable(0.5 * Player.haste_factor) and Target.timeToDie > MindBlast:CastTime() and ShadowVulnerabilityPriest:Stack() >= 5 and ShadowVulnerabilityPriest:Remains() > MindBlast:CastTime() then
@@ -2055,15 +2041,10 @@ function UI:UpdateDisplay()
 		dim = Opt.dimmer
 		if channel.tick_count > 1 then
 			local ctime = GetTime()
-			channel.ticks = ((ctime - channel.start) / channel.tick_interval) - channel.ticks_extra
+			channel.ticks = (ctime - channel.start) / channel.tick_interval
 			channel.ticks_remain = (channel.ends - ctime) / channel.tick_interval
 			text_center = format('TICKS\n%.1f', max(0, channel.ticks))
-			if channel.ability == Player.main then
-				if channel.ticks_remain < 1 or channel.early_chainable then
-					dim = false
-					text_center = '|cFF00FF00CHAIN'
-				end
-			elseif MindFlay:Channeling() and not Player.clip_flay_early then
+			if MindFlay:Channeling() and not MindFlay.clip_early then
 				local clip = channel.ends - channel.tick_interval - ctime
 				if clip > 0 then
 					text_center = format('|cFFFFFD00CLIP\n%.1fs', clip)
