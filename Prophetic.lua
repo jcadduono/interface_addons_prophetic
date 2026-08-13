@@ -70,7 +70,14 @@ end
 
 local function ToUID(guid)
 	local uid = guid:match('^%w+-%d+-%d+-%d+-%d+-(%d+)')
-	return uid and tonumber(uid)
+	if uid then
+		return tonumber(uid)
+	end
+	uid = guid:match('^%w+-%d+-(%w+)$')
+	if uid then
+		return tonumber(uid, 16)
+	end
+	return 0
 end
 -- end useful functions
 
@@ -329,7 +336,7 @@ function AutoAoe:Add(guid, update)
 		return
 	end
 	local uid = ToUID(guid)
-	if uid and self.ignored_units[uid] then
+	if uid > 0 and self.ignored_units[uid] then
 		self.blacklist[guid] = Player.time + 10
 		return
 	end
@@ -1585,7 +1592,7 @@ function Target:Update()
 	end
 	if guid ~= self.guid then
 		self.guid = guid
-		self.uid = ToUID(guid) or 0
+		self.uid = ToUID(guid)
 		self:UpdateHealth(true)
 	end
 	self.boss = false
@@ -2178,7 +2185,7 @@ end
 
 CombatEvent.UNIT_DIED = function(event, srcGUID, dstGUID)
 	local uid = ToUID(dstGUID)
-	if not uid then
+	if uid > 0 then
 		return
 	end
 	TrackedAuras:Remove(dstGUID)
