@@ -1417,11 +1417,7 @@ function Player:UpdateChannelInfo()
 		return
 	end
 	local ability = Abilities.bySpellId[spellId]
-	if ability then
-		channel.interrupt_if = ability.interrupt_if
-	else
-		channel.interrupt_if = nil
-	end
+	channel.interrupt_if = ability and ability.interrupt_if
 	channel.ability = ability
 	channel.ticks = 0
 	channel.start = start / 1000
@@ -1729,7 +1725,7 @@ APL.Main = function(self)
 	if Player:TimeInCombat() == 0 then
 		local apl = self:Buffs(Target.boss and 180 or 30)
 		if apl then return apl end
-		if PowerWordShield:Usable() and PowerWordShield:Remains() < 10 then
+		if PowerWordShield:Usable() and PowerWordShield:Remains() < 4 then
 			UseCooldown(PowerWordShield)
 		end
 	else
@@ -1782,6 +1778,9 @@ APL.Shadow = function(self)
 	if Player:TimeInCombat() == 0 then
 		if Shadowform:Usable() and Shadowform:Down() then
 			return Shadowform
+		end
+		if not VampiricTouch.known and MindBlast:Usable() then
+			return MindBlast
 		end
 	else
 		if Shadowform:Usable() and Shadowform:Down() then
@@ -2044,13 +2043,14 @@ function UI:UpdateDisplay()
 			channel.ticks = (ctime - channel.start) / channel.tick_interval
 			channel.ticks_remain = (channel.ends - ctime) / channel.tick_interval
 			text_center = format('TICKS\n%.1f', max(0, channel.ticks))
-			if MindFlay:Channeling() and not MindFlay.clip_early then
+			if MindFlay:Channeling() and not MindFlay.clip_early and Player.main ~= MindFlay then
 				local clip = channel.ends - channel.tick_interval - ctime
 				if clip > 0 then
 					text_center = format('|cFFFFFD00CLIP\n%.1fs', clip)
 					dim = Opt.dimmer
 				end
-			elseif channel.interruptible then
+			end
+			if channel.interruptible then
 				dim = false
 			end
 		end
