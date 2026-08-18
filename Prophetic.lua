@@ -1512,7 +1512,7 @@ function Player:Update()
 	self.main = APL:Main()
 
 	if self.channel.interrupt_if then
-		self.channel.interruptible = self.channel.interrupt_if()
+		self.channel.interruptible = self.channel.ability ~= self.main and self.channel.interrupt_if()
 	end
 end
 
@@ -2185,7 +2185,7 @@ end
 
 CombatEvent.UNIT_DIED = function(event, srcGUID, dstGUID)
 	local uid = ToUID(dstGUID)
-	if uid > 0 then
+	if uid <= 0 then
 		return
 	end
 	TrackedAuras:Remove(dstGUID)
